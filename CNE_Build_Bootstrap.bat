@@ -18,7 +18,7 @@ set HOME=%cd%
 
 set CROSS_COMPILE=arm-rtems-
 rem set CROSS_COMPILE=arm-none-eabi-
-rem set CROSS_COMPILE=arm-rtemseabi4.11-
+set CROSS_COMPILE=arm-rtemseabi4.11-
 set ERASE_FCT=del /F
 make clean
 

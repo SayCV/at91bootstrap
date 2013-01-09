@@ -93,7 +93,10 @@ void hw_init(void)
 #ifdef CONFIG_DEBUG
         {"RXD", AT91C_PIN_PA(9), 0, PIO_DEFAULT, PIO_PERIPH_A},
         {"TXD", AT91C_PIN_PA(10), 0, PIO_DEFAULT, PIO_PERIPH_A},
+        {"RXD0", AT91C_PIN_PA(1), 0, PIO_DEFAULT, PIO_PERIPH_A},
+        {"TXD0", AT91C_PIN_PA(0), 0, PIO_DEFAULT, PIO_PERIPH_A},
 #endif
+				{"LED_GREEN", AT91C_PIN_PC(4), 0, PIO_DEFAULT, PIO_PERIPH_A},
         {(char *)0, 0, 0, PIO_DEFAULT, PIO_PERIPH_A},
     };
 
@@ -142,7 +145,8 @@ void hw_init(void)
     /*
      * Configure the PIO controller 
      */
-    writel((1 << AT91C_ID_PIOA_B), (PMC_PCER + AT91C_BASE_PMC));
+    //writel((1 << AT91C_ID_PIOA_B), (PMC_PCER + AT91C_BASE_PMC));
+    writel((1 << AT91C_ID_US0), (PMC_PCER + AT91C_BASE_PMC));
     pio_setup(hw_pio);
 
     /*
@@ -207,8 +211,8 @@ void ddramc_hw_init(void)
                                 19 << 8 |               //  19 * 7.5 = 142.5 ns ( > 128 + 10 ns)
                                 AT91C_DDRC2_TRFC_18);   //  18 * 7.5 = 135   ns (must be 128 ns for 1Gb DDR)
 
-    ddram_config.ddramc_t2pr = (AT91C_DDRC2_TFAW_7 |    //  7 * 7.5 = 52.5 ns
-                                AT91C_DDRC2_TRTP_2 |    //  2 clock cycles min
+    ddram_config.ddramc_t2pr = (AT91C_DDRC2_TFAW_7 |	//  7 * 7.5 = 52.5 ns
+    				AT91C_DDRC2_TRTP_2 |    //  2 clock cycles min
                                 AT91C_DDRC2_TRPA_3 |    //  3 * 7.5 = 22.5 ns
                                 AT91C_DDRC2_TXARDS_7 |  //  7 clock cycles
                                 AT91C_DDRC2_TXARD_2);   //  2 clock cycles
@@ -332,7 +336,7 @@ void nandflash_hw_init(void)
 
     reg = readl(AT91C_BASE_CCFG + CCFG_EBICSA);
     reg |= AT91C_EBI_CS3A_SM;
-    if (get_cm_rev() == 'A') {
+    if ((get_cm_rev() == 'A') && (get_cm_vendor() == VENDOR_EMBEST)) {
         reg &= ~AT91C_EBI_NFD0_ON_D16;
     } else {
         reg |= (AT91C_EBI_DDR_MP_EN | AT91C_EBI_NFD0_ON_D16);
@@ -357,7 +361,7 @@ void nandflash_hw_init(void)
      * Configure the PIO controller 
      */
     writel((1 << AT91C_ID_PIOC_D), (PMC_PCER + AT91C_BASE_PMC));
-    if (get_cm_rev() == 'A')
+    if ((get_cm_rev() == 'A') && (get_cm_vendor() == VENDOR_EMBEST))
         pio_setup(nand_pio_lo);
     else
         pio_setup(nand_pio_hi);
@@ -367,7 +371,7 @@ void nandflash_hw_init(void)
 
 void NAND_WAIT_READY()
 {
-    if (get_cm_rev() == 'A')
+    if ((get_cm_rev() == 'A') && (get_cm_vendor() == VENDOR_EMBEST))
         while (!(*(volatile unsigned int *)AT91C_PIOD_PDSR & AT91C_PIO_PD6))
             ;
     else
