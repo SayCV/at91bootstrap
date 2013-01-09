@@ -89,12 +89,12 @@ int main(void)
 #ifdef CONFIG_USER_HW_INIT
     user_hw_init();
 #endif
-
+/*
 #if defined(CONFIG_AT91SAM9X5EK)
     extern void load_1wire_info();
     load_1wire_info();
 #endif
-
+*/
     dbg_log(1, "Downloading image...\n\r");
 
 #if defined(CONFIG_LOAD_LINUX)
