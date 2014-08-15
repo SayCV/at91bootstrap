@@ -1,6 +1,5 @@
 menu "Memory selection"
 
-
 config CONFIG_SDRAM
 	bool
 	default n
@@ -13,7 +12,7 @@ config CONFIG_SDDRC
 	help
 	  Initialize DDR SDRAM controller before copying
 
-config CONFIG_DDR2
+config CONFIG_DDRC
 	bool
 	default n
 	help
@@ -47,9 +46,11 @@ config	ALLOW_SDRAM_16BIT
 	bool
 	default n
 
+menu "RAM Configuration"
+
 choice
 	prompt "RAM size"
-	depends on CONFIG_SDRAM || CONFIG_SDDRC || CONFIG_DDR2
+	depends on CONFIG_SDRAM || CONFIG_SDDRC || CONFIG_DDRC
 	default CONFIG_RAM_64MB
 
 config	CONFIG_RAM_32MB
@@ -64,22 +65,38 @@ config	CONFIG_RAM_128MB
 config	CONFIG_RAM_256MB
 	bool "256 MB"
 
+config	CONFIG_RAM_512MB
+	bool "512 MB"
+
 endchoice
+
+choice
+	prompt "DDR-SDRAM device type"
+	depends on CONFIG_DDRC
+	default CONFIG_DDR2
+
+config CONFIG_LPDDR2
+	bool "Low-power DDR2-SDRAM"
+
+config CONFIG_DDR2
+	bool "DDR2-SDRAM"
+
+endchoice
+
+endmenu
 
 config	CONFIG_SDRAM_16BIT
 	bool "Use 16 bit SDRAM"
 	depends on ALLOW_SDRAM_16BIT
 	help
 	  
-
 config	CONFIG_PSRAM
 	bool "Enable PSRAM on EBI1"
 	depends on ALLOW_PSRAM
 	help
 	  
-
 choice
-	prompt "Flash memory technology"
+	prompt "Flash Memory Technology"
 	default CONFIG_DATAFLASH
 	help
 	  Select memory for at91bootstrap
@@ -96,16 +113,11 @@ config	CONFIG_NANDFLASH
 	bool "NAND flash"
 	depends on ALLOW_NANDFLASH
 
-
 config	CONFIG_SDCARD
 	bool "SD card"
 	depends on ALLOW_SDCARD
 
 endchoice
-
-config	CONFIG_ENABLE_SW_ECC
-	bool "Support NAND flash software ECC"
-	depends on CONFIG_NANDFLASH
 
 config CONFIG_MEMORY
 	string
@@ -114,14 +126,30 @@ config CONFIG_MEMORY
 	default "nandflash"	if CONFIG_NANDFLASH
 	default "sdcard"	if CONFIG_SDCARD
 
+menu  "SD Card Configuration"
+	depends on CONFIG_SDCARD
+
 config CONFIG_SDCARD_HS
 	bool
-	default y if CONFIG_AT91SAM9G45EK
-	default y if CONFIG_AT91SAM9G45EKES
-	default y if CONFIG_AT91SAM9M10EK
-	default y if CONFIG_AT91SAM9M10EKES
-	default y if CONFIG_AT91SAM9X5EK
+	default y if AT91SAM9G45
+	default y if AT91SAM9X5
+	default y if AT91SAM9N12
+	default y if SAMA5D3X
 	default n
+
+config CONFIG_FATFS
+	bool
+	depends on CONFIG_SDCARD
+	default y if CONFIG_SDCARD
+
+config CONFIG_LONG_FILENAME
+	bool "Support Long FileName(LFN)"
+	depends on CONFIG_FATFS
+	default y if !AT91SAM9G10
+	help
+	  Configure support to FatFS Long FileName(LFN)
+
+endmenu
 
 source "driver/Config.in.dataflash"
 
@@ -129,11 +157,10 @@ source "driver/Config.in.nandflash"
 
 config CONFIG_BOOTSTRAP_MAXSIZE
 	string
-	default "4096"  if CONFIG_AT91SAM9260EK
-	default "8192"  if CONFIG_AT91SAM9G10EK && CONFIG_SDCARD
-	default "12288"  if CONFIG_AT91SAM9G10EK && !CONFIG_SDCARD
-	default "4096"  if CONFIG_AFEB9260
+	default "4096" if AT91SAM9260
+	default "8192" if AT91SAM9G10 && CONFIG_SDCARD
+	default "12288" if AT91SAM9G10 && !CONFIG_SDCARD
+	default "65536"	if SAMA5D3X
 	default "23000"
 
 endmenu
-

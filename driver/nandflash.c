@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------------
- *         ATMEL Microcontroller Software Support  -  ROUSSET  -
+ *         ATMEL Microcontroller Software Support
  * ----------------------------------------------------------------------------
  * Copyright (c) 2006, Atmel Corporation
-
+ *
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,790 +24,962 @@
  * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- * ----------------------------------------------------------------------------
- * File Name           : nandflash.c
- * Object              :
- * Creation            : NLe Sep 28th 2006
- *-----------------------------------------------------------------------------
  */
-#include <stdlib.h>
-#include "part.h"
-#include "main.h"
+#include "common.h"
+#include "hardware.h"
+#include "board.h"
+#include "arch/at91_pio.h"
+#include "gpio.h"
+
 #include "debug.h"
 
-#ifdef CONFIG_NANDFLASH
-
-#include "nandflash.h"
+#include "nand.h"
+#include "pmecc.h"
 #include "hamming.h"
+#include "timer.h"
+#include "fdt.h"
+#include "div.h"
 
-#ifndef NAND_WAIT_READY
-extern void NAND_WAIT_READY();
+#ifdef CONFIG_NANDFLASH_SMALL_BLOCKS
+static struct nand_chip nand_ids[] = {
+	/* Samsung 32MB 8Bit */
+	{0xec75, 0x800, 0x4000,  0x200, 0x10, 0x0},
+	{0,}
+};
+#else
+static struct nand_chip nand_ids[] = {
+	/* Samsung K9F2G08U0M 256MB */
+	{0xecda, 0x800, 0x20000, 0x800, 0x40, 0x0},
+	/* Samsung K9F2G08U0A 256MB */
+	{0xecaa, 0x800, 0x20000, 0x800, 0x40, 0x0},
+	/* Micron MT29F2G16AAB 256MB */
+	{0x2cca, 0x800, 0x20000, 0x800, 0x40, 0x1},
+	/* Micron MT29F2G08AAC 256MB  */
+	{0x2cda, 0x800, 0x20000, 0x800, 0x40, 0x0},
+	/* Micron MT29F2G08ABD 256MB */
+	{0x2caa, 0x800, 0x20000, 0x800, 0x40, 0x0},
+	/* Hynix HY27UF082G2A 256MB */
+	{0xadda, 0x800, 0x20000, 0x800, 0x40, 0x0},
+	/* Hynix HY27UF162G2A 256MB */
+	{0xadca, 0x800, 0x20000, 0x800, 0x40, 0x1},
+	/* Mircon MT29H8G08ACAH1 1GB */
+	{0x2c38, 0x800, 0x80000, 0x1000, 0xe0, 0x0},
+	/* EON EN27LN1G08 128MB */
+	{0x92f1, 0x400, 0x20000, 0x800, 0x40, 0x0},
+	{0,}
+};
 #endif
 
-/*----------------------------------------------------------------------------*/
-/* NAND Commands							      */
-/*----------------------------------------------------------------------------*/
+/* ooblayout */
+static struct nand_ooblayout nand_oob_layout;
+
+static struct nand_chip nand_chip_default;
+
+/*
+ * NAND Commands
+ */
+
 /* 8 bits devices */
-#define WRITE_NAND_COMMAND(d) do { \
-	*(volatile unsigned char *) \
-	((unsigned long)AT91C_SMARTMEDIA_BASE | AT91_SMART_MEDIA_CLE) = \
-	(unsigned char)(d); \
-	} while(0)
+static void nand_command(unsigned char cmd)
+{
+	volatile unsigned long ioaddr = (unsigned long)CONFIG_SYS_NAND_BASE
+						| CONFIG_SYS_NAND_MASK_CLE;
 
-#define WRITE_NAND_ADDRESS(d) do { \
-	*(volatile unsigned char *) \
-	((unsigned long)AT91C_SMARTMEDIA_BASE | AT91_SMART_MEDIA_ALE) = \
-	(unsigned char)(d); \
-	} while(0)
+	writeb(cmd, ioaddr);
+}
 
-#define WRITE_NAND(d) do { \
-	*(volatile unsigned char *) \
-	((unsigned long)AT91C_SMARTMEDIA_BASE) = (unsigned char)d; \
-	} while(0)
+static void nand_address(unsigned char addr)
+{
+	volatile unsigned long ioaddr = (unsigned long)CONFIG_SYS_NAND_BASE
+						| CONFIG_SYS_NAND_MASK_ALE;
 
-#define READ_NAND() ((unsigned char)(*(volatile unsigned char *) \
-	(unsigned long)AT91C_SMARTMEDIA_BASE))
+	writeb(addr, ioaddr);
+}
+
+static unsigned char read_byte(void)
+{
+	return(readb((unsigned long)CONFIG_SYS_NAND_BASE));
+}
 
 /* 16 bits devices */
-#define WRITE_NAND_COMMAND16(d) do { \
-	*(volatile unsigned short *) \
-	((unsigned long)AT91C_SMARTMEDIA_BASE | AT91_SMART_MEDIA_CLE) = \
-	(unsigned short)(d); \
-	} while(0)
+static void nand_command16(unsigned char cmd)
+{
+	volatile unsigned long ioaddr = (unsigned long)CONFIG_SYS_NAND_BASE
+						| CONFIG_SYS_NAND_MASK_CLE;
 
-#define WRITE_NAND_ADDRESS16(d) do { \
-	*(volatile unsigned short *) \
-	((unsigned long)AT91C_SMARTMEDIA_BASE | AT91_SMART_MEDIA_ALE) = \
-	(unsigned short)(d); \
-	} while(0)
+	writew(cmd, ioaddr);
+}
 
-#define WRITE_NAND16(d) do { \
-	*(volatile unsigned short *) \
-	((unsigned long)AT91C_SMARTMEDIA_BASE) = (unsigned short)d; \
-	} while(0)
+static void nand_address16(unsigned char addr)
+{
+	volatile unsigned long ioaddr = (unsigned long)CONFIG_SYS_NAND_BASE
+						| CONFIG_SYS_NAND_MASK_ALE;
 
-#define READ_NAND16() ((unsigned short)(*(volatile unsigned short *) \
-						(unsigned long)AT91C_SMARTMEDIA_BASE))
-#undef CONFIG_USE_PMECC
-#if defined(CPU_HAS_PMECC) && !defined(CONFIG_ENABLE_SW_ECC)
-#define CONFIG_USE_PMECC
+	writew(addr, ioaddr);
+}
+
+static unsigned short read_word(void)
+{
+	return(readw((unsigned long)CONFIG_SYS_NAND_BASE));
+}
+
+static void nand_wait_ready(void)
+{
+	unsigned int timeout = 10000;
+
+	nand_command(CMD_STATUS);
+	while ((!(read_byte() & STATUS_READY)) && timeout--)
+		;
+}
+
+static void nand_cs_enable(void)
+{
+#ifdef CONFIG_SYS_NAND_ENABLE_PIN
+	pio_set_value(CONFIG_SYS_NAND_ENABLE_PIN, 0);
 #endif
+}
 
-#ifdef CONFIG_USE_PMECC
-#define TT_MAX  25
-
-/* ECC offset in spare area */
-#define ECC_START_ADDR		48
-#define ECC_END_ADDR		63
-
-#ifdef CONFIG_AT91SAM9X5EK
-#define PMECC_ALGO_FCT_ADDR     0x00100008
-#define LOOKUP_TABLE_ALPHA_TO   0x10C000;
-#define LOOKUP_TABLE_INDEX_OF   0x108000;
+static void nand_cs_disable(void)
+{
+#ifdef CONFIG_SYS_NAND_ENABLE_PIN
+	pio_set_value(CONFIG_SYS_NAND_ENABLE_PIN, 1);
 #endif
-
-struct _PMECC_paramDesc_struct {
-    unsigned int pageSize;
-    unsigned int spareSize;
-    unsigned int sectorSize;  // 0 for 512, 1 for 1024 bytes, like in PMECCFG register
-    unsigned int errBitNbrCapability;
-    unsigned int eccSizeByte;
-    unsigned int eccStartAddr;
-    unsigned int eccEndAddr;
-
-    unsigned int nandWR;
-    unsigned int spareEna;
-    unsigned int modeAuto;
-    unsigned int clkCtrl;
-    unsigned int interrupt;
-
-    int tt;
-    int mm;
-    int nn;
-
-    short *alpha_to;
-    short *index_of;
-
-    short partialSyn[100];
-    short si[100];
-
-    /* sigma table */
-    short smu[TT_MAX + 2][2 * TT_MAX + 1];
-    /* polynom order */
-    short lmu[TT_MAX + 1];
-
-} PMECC_paramDesc_struct;
-
-typedef int (*PMECC_CorrectionAlgo_Rom_Func)(unsigned long pPMECC,
-                                unsigned long pPMERRLOC,
-                                struct _PMECC_paramDesc_struct *PMECC_desc,
-                                unsigned int PMECC_status,
-                                void *pageBuffer);
-
-PMECC_CorrectionAlgo_Rom_Func PMECC_CorrectionAlgo;
-
-#endif /* CONFIG_USE_PMECC */
-
-static inline struct SNandInitInfo *AT91F_GetNandInitInfo(unsigned short chipID)
-{
-    static struct SNandInitInfo info;
-
-    //info.uNandID = chipID;
-    info.uNandNbBlocks = 0x800;
-    info.uNandBlockSize = 0x20000;
-    info.uNandSectorSize = 0x800;
-    info.uNandSpareSize = 0x40;
-    info.uNandBusWidth = 0;
-    info.pSpareScheme = &Spare_2048;
-
-    dbg_log(1, "chip id: %x\n\r", chipID);
-
-    switch (chipID) {
-    case 0x2cca:
-        info.uNandBusWidth = 0x1;
-        break;
-    case 0x2cdc:
-        info.uNandNbBlocks = 0x1000;
-        break;
-    case 0x2cda:
-    case 0x2caa:
-    case 0xecda:
-    case 0xecaa:
-    case 0x20aa:
-    case 0xadda:
-        break;
-    default:
-        return 0;
-    }
-
-    return &info;
 }
 
-static void AT91F_NandInit(PSNandInfo pNandInfo, PSNandInitInfo pNandInitInfo)
+#ifdef CONFIG_NANDFLASH_SMALL_BLOCKS
+static void config_nand_ooblayout(struct nand_ooblayout *layout,
+				struct nand_chip *chip)
 {
-    unsigned int uSectorSize, i = 0;
+	layout->badblockpos = 5;
+	layout->eccpos[0] = 0;
+	layout->eccpos[1] = 1;
+	layout->eccpos[2] = 2;
 
-    /*
-     * Nb of blocks in device 
-     */
-    pNandInfo->uNbBlocks = pNandInitInfo->uNandNbBlocks;
-    /*
-     * Nb of data bytes in a block 
-     */
-    pNandInfo->uBlockNbData = pNandInitInfo->uNandBlockSize;
-    /*
-     * Nb of bytes in Data area 
-     */
-    pNandInfo->uDataNbBytes = pNandInitInfo->uNandSectorSize;
-    /*
-     * Nb of bytes in Spare area 
-     */
-    pNandInfo->uSpareNbBytes = pNandInitInfo->uNandSpareSize;
-    /*
-     * Total nb of bytes in a sector 
-     */
-    pNandInfo->uSectorNbBytes = pNandInfo->uDataNbBytes +
-        pNandInfo->uSpareNbBytes;
-    pNandInfo->pSpareScheme = pNandInitInfo->pSpareScheme;
+	switch (chip->pagesize) {
+	case 256:
+		layout->eccbytes = 3;
+		break;
 
-    pNandInfo->uDataBusWidth = pNandInitInfo->uNandBusWidth;    /* Data Bus Width (8/16 bits) */
+	case 512:
+		layout->eccbytes = 6;
+		layout->eccpos[3] = 3;
+		layout->eccpos[4] = 6;
+		layout->eccpos[5] = 7;
+		break;
 
-    uSectorSize = pNandInfo->uDataNbBytes - 1;
-    pNandInfo->uOffset = 0;
-
-    while (uSectorSize >> i) {
-        pNandInfo->uOffset++;
-        i++;
-    }
-
-    if (pNandInfo->uDataBusWidth) {
-        pNandInfo->uBadBlockInfoOffset = 2 * BAD_BLOCK_INFO_OFFSET;
-    } else {
-        pNandInfo->uBadBlockInfoOffset = BAD_BLOCK_INFO_OFFSET;
-    }
+	default:
+		break;
+	}
 }
-
-static void reset_nandflash(void)
-{
-    NAND_ENABLE_CE();
-    WRITE_NAND_COMMAND(0xFF);
-    NAND_WAIT_READY();
-    NAND_WAIT_READY();
-    NAND_DISABLE_CE();
-}
-
-static PSNandInitInfo AT91F_NandReadID(void)
-{
-    unsigned int uChipID;
-
-    unsigned char bManufacturerID, bDeviceID;
-
-    /*
-     * Enable chipset 
-     */
-    NAND_ENABLE_CE();
-
-    /*
-     * Ask the Nand its IDs 
-     */
-    WRITE_NAND_COMMAND(CMD_READID);
-    WRITE_NAND_ADDRESS(0x00);
-
-    /*
-     * Read answer 
-     */
-    bManufacturerID = READ_NAND();
-    bDeviceID = READ_NAND();
-
-    /*
-     * Disable chipset before returning 
-     */
-    NAND_DISABLE_CE();
-
-    uChipID = (bManufacturerID << 8) | bDeviceID;
-
-    return AT91F_GetNandInitInfo(uChipID);
-}
-
-static void AT91F_WriteLarge_BlkAdr(unsigned int Adr)
-{
-    WRITE_NAND_ADDRESS((Adr >> 0) & 0xFF);
-    WRITE_NAND_ADDRESS((Adr >> 8) & 0xFF);
-}
-
-static void AT91F_WriteSectorAdr(unsigned int Adr)
-{
-    AT91F_WriteLarge_BlkAdr(Adr);
-    WRITE_NAND_ADDRESS((Adr >> 16) & 0xFF);
-}
-
-BOOL AT91F_NandEraseBlock0(void)
-{
-    unsigned int uPhySecNb = 0;
-
-    BOOL bRet = TRUE;
-
-    NAND_ENABLE_CE();
-
-    WRITE_NAND_COMMAND(CMD_ERASE_1);
-
-    /*
-     * Push sector address in three cycles 
-     */
-    AT91F_WriteSectorAdr(uPhySecNb);
-
-    WRITE_NAND_COMMAND(CMD_ERASE_2);
-
-    /*
-     * Wait for nand to be ready 
-     */
-    NAND_WAIT_READY();
-    NAND_WAIT_READY();
-
-    /*
-     * Check status bit for error notification 
-     */
-    WRITE_NAND_COMMAND(CMD_STATUS);
-    NAND_WAIT_READY();
-    if (READ_NAND() & STATUS_ERROR) {
-        bRet = FALSE;
-        goto exit;
-    }
-
- exit:
-    NAND_DISABLE_CE();
-
-    return bRet;
-}
-
-#ifdef NANDFLASH_SMALL_BLOCKS
-BOOL AT91F_NandReadSector(PSNandInfo pNandInfo, unsigned int uSectorAddr,
-                          unsigned char *pOutBuffer, unsigned int fZone)
-{
-    BOOL bRet = TRUE;
-
-    unsigned int uBytesToRead, i;
-
-    unsigned char Cmd;
-
-    /*
-     * WARNING : During a read procedure you can't call the ReadStatus flash cmd
-     * * The ReadStatus fill the read register with 0xC0 and then corrupt the read
-     */
-
-    /*
-     * Push offset address 
-     */
-    switch (fZone) {
-    case ZONE_DATA:
-        uBytesToRead = pNandInfo->uDataNbBytes;
-        Cmd = CMD_READ_A0;
-        break;
-    case ZONE_INFO:
-        uBytesToRead = pNandInfo->uSpareNbBytes;
-        pOutBuffer += pNandInfo->uDataNbBytes;
-        Cmd = CMD_READ_C;
-        break;
-    case ZONE_DATA | ZONE_INFO:
-        uBytesToRead = pNandInfo->uSectorNbBytes;
-        Cmd = CMD_READ_A0;
-        break;
-    default:
-        bRet = FALSE;
-        goto exit;
-    }
-
-    /*
-     * Enable the chip 
-     */
-    NAND_ENABLE_CE();
-
-    /*
-     * Write specific command, Read from start 
-     */
-    if (pNandInfo->uDataBusWidth) {
-        /*
-         * 16 bits 
-         */
-        WRITE_NAND_COMMAND16(Cmd);
-    } else {
-        /*
-         * 8 bits 
-         */
-        WRITE_NAND_COMMAND(Cmd);
-    }
-
-    /*
-     * Push sector address 
-     */
-    uSectorAddr >>= pNandInfo->uOffset;
-
-    if (pNandInfo->uDataBusWidth) {
-        /*
-         * 16 bits 
-         */
-        WRITE_NAND_ADDRESS16(0x00);
-        WRITE_NAND_ADDRESS16((uSectorAddr >> 0) & 0xFF);
-        WRITE_NAND_ADDRESS16((uSectorAddr >> 8) & 0xFF);
-        WRITE_NAND_ADDRESS16((uSectorAddr >> 16) & 0xFF);
-    } else {
-        /*
-         * 8 bits 
-         */
-        WRITE_NAND_ADDRESS(0x00);
-        WRITE_NAND_ADDRESS((uSectorAddr >> 0) & 0xFF);
-        WRITE_NAND_ADDRESS((uSectorAddr >> 8) & 0xFF);
-        WRITE_NAND_ADDRESS((uSectorAddr >> 16) & 0xFF);
-    }
-
-    /*
-     * Wait for flash to be ready (can't pool on status, read upper WARNING) 
-     */
-    NAND_WAIT_READY();
-    /*
-     * Need to be done twice, READY detected too early the first time? 
-     */
-    NAND_WAIT_READY();
-
-    /*
-     * Read loop 
-     */
-    if (pNandInfo->uDataBusWidth) {
-        /*
-         * 16 bits 
-         */
-        for (i = 0; i < uBytesToRead / 2; i++)  // Div2 because of 16bits
-        {
-            *((short *)pOutBuffer) = READ_NAND16();
-            pOutBuffer += 2;
-        }
-    } else {
-        /*
-         * 8 bits 
-         */
-        if (Cmd == CMD_READ_C) {
-            for (i = 0; i < uBytesToRead; i++) {
-                *pOutBuffer = READ_NAND();
-                pOutBuffer++;
-            }
-        } else {
-            for (i = 0; i < uBytesToRead / 2; i++) {
-                *pOutBuffer = READ_NAND();
-                pOutBuffer++;
-            }
-
-            Cmd = CMD_READ_A1;
-            WRITE_NAND_COMMAND(Cmd);
-            WRITE_NAND_ADDRESS(0x00);
-            WRITE_NAND_ADDRESS((uSectorAddr >> 0) & 0xFF);
-            WRITE_NAND_ADDRESS((uSectorAddr >> 8) & 0xFF);
-            WRITE_NAND_ADDRESS((uSectorAddr >> 16) & 0xFF);
-
-            NAND_WAIT_READY();
-            /*
-             * Need to be done twice, READY detected too early the first time? 
-             */
-            NAND_WAIT_READY();
-
-            for (i = 0; i < (uBytesToRead / 2); i++) {
-                *pOutBuffer = READ_NAND();
-                pOutBuffer++;
-            }
-        }
-    }
-
- exit:
-    /*
-     * Disable the chip 
-     */
-    NAND_DISABLE_CE();
-
-    return bRet;
-}
-
-#else                           /* For large blocks */
-static BOOL AT91F_NandReadSector(PSNandInfo pNandInfo, unsigned int uSectorAddr,
-                                 unsigned char *pOutBuffer, unsigned int fZone)
-{
-    BOOL bRet = TRUE;
-
-    unsigned int uBytesToRead, i;
-
-    unsigned int Addr;
-
-#ifdef CONFIG_USE_PMECC
-    unsigned int bch_status;
-    unsigned char *pbuf = pOutBuffer;
-
-    PMECC_paramDesc_struct.modeAuto = AT91C_BCH_AUTO_ENA;
-    PMECC_paramDesc_struct.nandWR = 0;
-
-    writel(AT91C_BCH_RST, AT91C_BCH_PMECCTRL);
-    writel(AT91C_BCH_DISABLE, AT91C_BCH_PMECCTRL);
-    writel(PMECC_paramDesc_struct.errBitNbrCapability |
-        PMECC_paramDesc_struct.sectorSize |
-        PMECC_paramDesc_struct.pageSize |
-        PMECC_paramDesc_struct.nandWR |
-        PMECC_paramDesc_struct.spareEna |
-        PMECC_paramDesc_struct.modeAuto, AT91C_BCH_PMECCFG0);
-    writel(PMECC_paramDesc_struct.spareSize - 1, AT91C_BCH_PMECCFG1);
-    writel(PMECC_paramDesc_struct.eccStartAddr, AT91C_BCH_PMECCFG2);
-    writel(PMECC_paramDesc_struct.eccEndAddr, AT91C_BCH_PMECCFG3);
-    writel(PMECC_paramDesc_struct.clkCtrl, AT91C_BCH_PMECCFG4);
-    writel(0xFF, AT91C_BCH_PMECCIDR);
-    writel(AT91C_BCH_ENABLE, AT91C_BCH_PMECCTRL);
-    writel(AT91C_BCH_DATAMODE, AT91C_BCH_PMECCTRL);
-
-    fZone = ZONE_DATA | ZONE_INFO;
-#endif
-    /*
-     * WARNING : During a read procedure you can't call the ReadStatus flash cmd
-     * * The ReadStatus fill the read register with 0xC0 and then corrupt the read
-     */
-
-    /*
-     * Enable the chip 
-     */
-    NAND_ENABLE_CE();
-
-    /*
-     * Write specific command, Read from start 
-     */
-    WRITE_NAND_COMMAND(CMD_READ_1);
-
-    /*
-     * Push offset address 
-     */
-    Addr = 0x00;
-    switch (fZone) {
-    case ZONE_DATA:
-        uBytesToRead = pNandInfo->uDataNbBytes;
-        break;
-    case ZONE_INFO:
-        uBytesToRead = pNandInfo->uSpareNbBytes;
-        pOutBuffer += pNandInfo->uDataNbBytes;
-        Addr = pNandInfo->uDataNbBytes;
-        if (pNandInfo->uDataBusWidth) { /* 16 bits */
-            Addr = Addr / 2;
-            /*
-             * Div 2 is because we address in word and not in byte 
-             */
-        }
-        break;
-    case ZONE_DATA | ZONE_INFO:
-        uBytesToRead = pNandInfo->uSectorNbBytes;
-        break;
-    default:
-        bRet = FALSE;
-        goto exit;
-    }
-    AT91F_WriteLarge_BlkAdr(Addr);
-
-    /*
-     * Push sector address 
-     */
-    uSectorAddr >>= pNandInfo->uOffset;
-
-    AT91F_WriteSectorAdr(uSectorAddr);
-
-    WRITE_NAND_COMMAND(CMD_READ_2);
-
-    /*
-     * Wait for flash to be ready (can't pool on status, read upper WARNING) 
-     */
-    NAND_WAIT_READY();
-    /*
-     * Need to be done twice, READY detected too early the first time? 
-     */
-    NAND_WAIT_READY();
-
-    /*
-     * Read loop 
-     */
-    if (pNandInfo->uDataBusWidth) {
-        /*
-         * Div2 because of 16bits 
-         */
-        for (i = 0; i < uBytesToRead / 2; i++) {
-            *((short *)pOutBuffer) = READ_NAND16();
-            pOutBuffer += 2;
-        }
-    } else {
-        for (i = 0; i < uBytesToRead; i++) {
-            *pOutBuffer++ = READ_NAND();
-        }
-    }
-
-#ifdef CONFIG_USE_PMECC
-    while (readl(AT91C_BCH_PMECCSR) & 1)
-        ;
-    bch_status = readl(AT91C_BCH_PMECCISR);
-    i = 0;
-    if (bch_status)
-        i = PMECC_CorrectionAlgo(AT91C_BCH_PMECCFG0, AT91C_BCHEL_PMECCELCR,
-            &PMECC_paramDesc_struct, bch_status, pbuf);
-    if (i != 0)
-        bRet = FALSE;
-#endif
-
- exit:
-    /*
-     * Disable the chip 
-     */
-    NAND_DISABLE_CE();
-
-    return bRet;
-}
-#endif
-
-//*----------------------------------------------------------------------------
-//* \fn    IsGoodBlock
-//* \brief Check if block is marked Bad
-//*----------------------------------------------------------------------------
-static BOOL IsGoodBlock(PSNandInfo pNandInfo, unsigned int uBlockNb,
-                        unsigned char *pOutBuffer)
-{
-    unsigned int i = 0;
-
-    PSSectorInfo pSectorInfo;
-
-    unsigned int uSectorAddr = uBlockNb * pNandInfo->uBlockNbData;
-
-    // Read first page and second page spare zone to detect if block is bad
-    for (i = 0; i < 2; i++) {
-        AT91F_NandReadSector(pNandInfo,
-                             uSectorAddr + i * pNandInfo->uDataNbBytes,
-                             pOutBuffer, ZONE_INFO);
-        pSectorInfo = (PSSectorInfo) & pOutBuffer[pNandInfo->uDataNbBytes];
-        if (pSectorInfo->spare[pNandInfo->uBadBlockInfoOffset] != BAD_BLOCK_TAG) {
-            /*
-             * Bad block found 
-             */
-            return FALSE;
-        }
-    }
-
-    return TRUE;
-}
-
-//*----------------------------------------------------------------------------
-//* \fn    AT91F_NandRead
-//* \brief Read Sector Algorithm
-//*----------------------------------------------------------------------------
-BOOL AT91F_NandRead(PSNandInfo pNandInfo, unsigned int uBlockNb,
-                    unsigned int uSectorNb, unsigned int uSpareValue,
-                    unsigned char *pOutBuffer)
-{
-    unsigned int uSectorAddr = uBlockNb * pNandInfo->uBlockNbData
-        + uSectorNb * pNandInfo->uDataNbBytes;
-
-    if (IsGoodBlock(pNandInfo, uBlockNb, pOutBuffer) == FALSE) {
-        dbg_log(1, "Bad block: #%d\n\r", uBlockNb);
-        return FALSE;
-    }
-#ifndef CONFIG_ENABLE_SW_ECC
-    return AT91F_NandReadSector(pNandInfo, uSectorAddr, pOutBuffer, ZONE_DATA);
 #else
-    {
-        BOOL ret;
-
-        unsigned char hamming[48], error;
-
-        ret = AT91F_NandReadSector(pNandInfo, uSectorAddr, pOutBuffer,
-                                   ZONE_DATA | ZONE_INFO);
-
-        if (ret != TRUE)
-            return ret;
-        NandSpareScheme_ReadEcc(pNandInfo->pSpareScheme,
-                                pOutBuffer + pNandInfo->uDataNbBytes, hamming);
-
-        error =
-            Hamming_Verify256x(pOutBuffer, pNandInfo->uDataNbBytes, hamming);
-        if (error && (error != Hamming_ERROR_SINGLEBIT)) {
-            dbg_log(1, "Hamming ECC error!\n\r");
-            return FALSE;
-        }
-    }
-    return TRUE;
-#endif
-}
-
-int read_nandflash(unsigned char *dst, unsigned long offset, int len)
+static void config_nand_ooblayout(struct nand_ooblayout *layout,
+				struct nand_chip *chip)
 {
-    SNandInfo sNandInfo;
-
-    PSNandInitInfo pNandInitInfo;
-
-    unsigned char *pOutBuffer = dst;
-
-    unsigned int blockIdx, badBlock, length, sizeToRead, nbSector, sectorIdx,
-        dataLeft;
-
-    nandflash_hw_init();
-    reset_nandflash();
-
-    /*
-     * Read Nand Chip ID 
-     */
-    pNandInitInfo = AT91F_NandReadID();
-
-    if (!pNandInitInfo) {
-        dbg_log(DEBUG_INFO, "\n\r-E- No NandFlash detected !!!\n\r");
-        return -1;
-    }
-    dbg_log(1, "Copy %d bytes from %d to %d\r\n", len, offset, dst);
-
-    /*
-     * Initialize NandInfo Structure 
-     */
-    AT91F_NandInit(&sNandInfo, pNandInitInfo);
-
-    if (!sNandInfo.uDataBusWidth)
-        nandflash_cfg_8bits_dbw_init();
+	unsigned int i;
+	unsigned int oobsize = chip->oobsize;
+	layout->badblockpos = 0;
 
 #ifdef CONFIG_USE_PMECC
-    PMECC_CorrectionAlgo = (PMECC_CorrectionAlgo_Rom_Func)
-        (*(unsigned int *)PMECC_ALGO_FCT_ADDR);
-    switch(sNandInfo.uDataNbBytes) {
-    case 2048:
-        PMECC_paramDesc_struct.pageSize = AT91C_BCH_PAGESIZE_4;
-        PMECC_paramDesc_struct.sectorSize = AT91C_BCH_BLKSIZE_512;
-        PMECC_paramDesc_struct.spareSize = 64;
-        PMECC_paramDesc_struct.errBitNbrCapability = 0; /* 2bits correction */
-        PMECC_paramDesc_struct.eccSizeByte = 16;
-        PMECC_paramDesc_struct.eccStartAddr = ECC_START_ADDR;
-        PMECC_paramDesc_struct.eccEndAddr = ECC_END_ADDR;
-        PMECC_paramDesc_struct.spareEna = 0;
-        PMECC_paramDesc_struct.clkCtrl = 2;  /* stated in datasheet */
-        PMECC_paramDesc_struct.interrupt = 0;
-        PMECC_paramDesc_struct.tt = 2;
-        PMECC_paramDesc_struct.mm = 13;
-        PMECC_paramDesc_struct.nn = (1 << PMECC_paramDesc_struct.mm) - 1;
-        PMECC_paramDesc_struct.alpha_to = (short *)LOOKUP_TABLE_ALPHA_TO;
-        PMECC_paramDesc_struct.index_of = (short *)LOOKUP_TABLE_INDEX_OF;
-        break;
-    case 512:
-    case 1024:
-    case 4096:
-        /* TODO */
-    default:
-        dbg_log(1, "Not supported page size: %d\n\r", sNandInfo.uDataNbBytes);
-        return -1;
-    }
+	layout->eccbytes = chip->pagesize / PMECC_SECTOR_SIZE
+		* get_pmecc_bytes();
+#else	/* Use Software ECC */
+	switch (chip->pagesize) {
+	case 2048:	/* oobsize is 64. */
+		layout->eccbytes = 24;
+		break;
+	default:
+		layout->eccbytes = 48;
+		/* Software ECC support up to 128-byte oob */
+		if (oobsize >= 128) {
+			/* oobsize can be 224, 448. */
+			dbg_info("NAND: Use software ECC." \
+				"But may cannot correct all errors!\n");
+			oobsize = 128;
+		} else {
+			dbg_info("NAND: Error! Software ECC not support pagesize: %d\n",
+				chip->pagesize);
+			return;
+		}
+		break;
+	}
 #endif
+	for (i = 0; i < layout->eccbytes; i++)
+		layout->eccpos[i] = oobsize - layout->eccbytes + i;
+}
+#endif /* #ifdef CONFIG_NANDFLASH_SMALL_BLOCKS */
 
-    /*
-     * Initialize the block offset 
-     */
-    blockIdx = offset / sNandInfo.uBlockNbData;
-    /*
-     * Initialize the number of bad blocks 
-     */
-    badBlock = 0;
-
-    length = len;
-
-    while (length > 0) {
-        /*
-         * Read a buffer corresponding to a block in the origin file 
-         */
-        if (length < sNandInfo.uBlockNbData) {
-            sizeToRead = length;
-        } else {
-            sizeToRead = sNandInfo.uBlockNbData;
-        }
-
-        /*
-         * Adjust the number of sectors to read 
-         */
-        nbSector = sizeToRead / sNandInfo.uDataNbBytes;
-        if (sizeToRead % sNandInfo.uDataNbBytes) {
-            nbSector++;
-        }
-
-        /*
-         * Loop until a valid block has been read 
-         */
-        while (1) {
-            /*
-             * Read the sectors 
-             */
-            for (sectorIdx = 0; sectorIdx < nbSector; sectorIdx++) {
-                dataLeft = sizeToRead - (sectorIdx * sNandInfo.uDataNbBytes);
-                if (dataLeft < sNandInfo.uDataNbBytes) {
-                    dataLeft =
-                        sizeToRead - (sectorIdx * sNandInfo.uDataNbBytes);
-                } else {
-                    dataLeft = sNandInfo.uDataNbBytes;
-                }
-
-                /*
-                 * Read the sector 
-                 */
-                if (AT91F_NandRead(&sNandInfo, blockIdx, sectorIdx, ZONE_DATA,
-                                   pOutBuffer) == FALSE) {
-                    // Move to next block
-                    break;
-                } else {
-                    pOutBuffer += sNandInfo.uDataNbBytes;
-                }
-            }
-
-            blockIdx++;
-            /*
-             * The full block is valid, then  exit the loop 
-             */
-            if (sectorIdx >= nbSector)
-                break;
-        }
-
-        /*
-         * Decrement length 
-         */
-        length -= sizeToRead;
-    }
-
-    return 0;
+#ifdef CONFIG_USE_ON_DIE_ECC_SUPPORT
+static void write_byte(unsigned char data)
+{
+	writeb(data, (unsigned long)CONFIG_SYS_NAND_BASE);
 }
 
-#endif /* CONFIG_NANDFLASH */
+static void nand_set_feature_on_die_ecc(unsigned char is_enable)
+{
+	unsigned char i;
+
+	nand_cs_enable();
+
+	nand_command(CMD_SET_FEATURE);
+	nand_address(0x90);
+
+	if (is_enable)
+		write_byte(0x08);
+	else
+		write_byte(0x00);
+
+	for (i = 0; i < 3; i++)
+		write_byte(0x00);
+
+	nand_cs_disable();
+}
+
+static unsigned char nand_get_feature_on_die_ecc(void)
+{
+	unsigned char buffer[4];
+	unsigned char i;
+
+	nand_cs_enable();
+
+	nand_command(CMD_GET_FEATURE);
+	nand_address(0x90);
+
+	for (i = 0; i < 4; i++)
+		buffer[i] = read_byte();
+
+	nand_cs_disable();
+
+	return buffer[0];
+}
+
+#define ENABLE_ECC	0x08
+
+static int nand_set_on_die_ecc(unsigned char is_enable)
+{
+	unsigned char status;
+
+	status = (nand_get_feature_on_die_ecc() & ENABLE_ECC) ? 1 : 0;
+	if (is_enable == status)
+		return 0;
+
+	nand_set_feature_on_die_ecc(is_enable);
+	status = (nand_get_feature_on_die_ecc() & ENABLE_ECC) ? 1 : 0;
+	if (is_enable == status)
+		return 0;
+
+	return -1;
+}
+
+static int nand_init_on_die_ecc(void)
+{
+	unsigned char is_enable;
+
+#ifdef CONFIG_ON_DIE_ECC
+	is_enable = 1;
+#else
+	is_enable = 0;
+#endif
+	if (nand_set_on_die_ecc(is_enable)) {
+		dbg_info("WARNING: Fail to %s On-Die ECC\n",
+				is_enable ? "enable" : "disable");
+
+	} else {
+		dbg_info("NAND: %s On-Die ECC\n",
+				is_enable ? "Enable" : "Disable");
+	}
+
+	return 0;
+}
+#endif /* #ifdef CONFIG_USE_ON_DIE_ECC_SUPPORT */
+
+#ifdef CONFIG_ONFI_DETECT_SUPPORT
+static unsigned short onfi_crc16(unsigned short crc,
+				unsigned char const *p,
+				unsigned int len)
+{
+	int i;
+
+	while (len--) {
+		crc ^= *p++ << 8;
+		for (i = 0; i < 8; i++)
+			crc = (crc << 1) ^ ((crc & 0x8000) ? 0x8005 : 0);
+	}
+
+	return crc;
+}
+
+#define ONFI_PARAMS_SIZE		256
+
+#define PARAMS_OFFSET_BUSWIDTH		6
+#define PARAMS_OFFSET_MODEL		49
+#define PARAMS_OFFSET_JEDEC_ID		64
+#define PARAMS_OFFSET_PAGESIZE		80
+#define PARAMS_OFFSET_OOBSIZE		84
+#define PARAMS_OFFSET_BLOCKSIZE		92
+#define PARAMS_OFFSET_NBBLOCKS		96
+#define PARAMS_OFFSET_ECC_BITS		112
+#define PARAMS_OFFSET_CRC		254
+
+#define ONFI_CRC_BASE			0x4F4E
+
+static int nandflash_detect_onfi(struct nand_chip *chip)
+{
+	unsigned char onfi_ind[4];
+	unsigned char onfi_params[ONFI_PARAMS_SIZE];
+	unsigned char *p = onfi_params;
+	unsigned char *param;
+	int i, j;
+	unsigned short crc;
+	unsigned char manf_id, dev_id;
+
+	nand_cs_enable();
+	nand_command(CMD_READID);
+	nand_address(0x20);
+
+	onfi_ind[0] = read_byte();
+	onfi_ind[1] = read_byte();
+	onfi_ind[2] = read_byte();
+	onfi_ind[3] = read_byte();
+	nand_cs_disable();
+
+	if ((onfi_ind[0] != 'O')
+		|| (onfi_ind[1] != 'N')
+		|| (onfi_ind[2] != 'F')
+		|| (onfi_ind[3] != 'I')) {
+		dbg_info("NAND: ONFI not supported\n");
+		return -1;
+	}
+
+	dbg_info("NAND: ONFI flash detected\n");
+
+	nand_cs_enable();
+
+	nand_command(CMD_READ_ONFI);
+	nand_address(0x00);
+	
+	nand_wait_ready();
+	nand_command(CMD_READ_1);
+	
+	for (i = 0; i < 3; i++) {
+		param = onfi_params;
+		/* Read the onfi parameter table */
+		for (j = 0; j < ONFI_PARAMS_SIZE; j++)
+			*param++ = read_byte();
+
+		crc = *(unsigned short *)(p + PARAMS_OFFSET_CRC);
+		if (onfi_crc16(ONFI_CRC_BASE, (unsigned char *)p, 254) == crc)
+			break;
+	}
+
+	nand_cs_disable();
+
+	if (i == 3) {
+		dbg_info("NAND: ONFI para CRC error!\n");
+		return -1;
+	}
+
+	chip->numblocks = *(unsigned short *)(p + PARAMS_OFFSET_NBBLOCKS);
+	chip->pagesize	= *(unsigned short *)(p + PARAMS_OFFSET_PAGESIZE);
+	chip->blocksize = *(unsigned int  *)(p + PARAMS_OFFSET_BLOCKSIZE)
+							* chip->pagesize;
+	chip->oobsize	= *(unsigned short *)(p + PARAMS_OFFSET_OOBSIZE);
+	chip->buswidth	= (*(unsigned char *)(p + PARAMS_OFFSET_BUSWIDTH))
+								& 0x01;
+
+	manf_id = *(unsigned char *)(p + PARAMS_OFFSET_JEDEC_ID);
+	dev_id = *(unsigned char *)(p + PARAMS_OFFSET_MODEL);
+	dbg_info("NAND: Manufacturer ID: %d Chip ID: %d\n", manf_id, dev_id);
+
+	return 0;
+}
+#endif /* #ifdef CONFIG_ONFI_DETECT_SUPPORT */
+
+static int nandflash_detect_non_onfi(struct nand_chip *chip)
+{
+	int manf_id, dev_id;
+	unsigned int chipid;
+	unsigned int i;
+
+	nand_cs_enable();
+
+	/* Reading device ID */
+	nand_command(CMD_READID);
+	nand_address(0x00);
+
+	manf_id  = read_byte();
+	dev_id   = read_byte();
+
+	nand_cs_disable();
+
+	chipid = (manf_id << 8) | dev_id;
+
+	for (i = 0; i < ARRAY_SIZE(nand_ids); i++) {
+		if (chipid == nand_ids[i].chip_id)
+			break;
+	}
+
+	if (i == ARRAY_SIZE(nand_ids)) {
+		dbg_info("NAND: Not found Manufacturer ID: %d," \
+			"Chip ID: 0x%d\n", manf_id, dev_id);
+
+		return -1;
+	}
+
+	dbg_info("NAND: Manufacturer ID: %d Chip ID: %d\n",
+						manf_id, dev_id);
+
+	chip->pagesize	= nand_ids[i].pagesize;
+	chip->blocksize = nand_ids[i].blocksize;
+	chip->oobsize	= nand_ids[i].oobsize;
+	chip->buswidth	= nand_ids[i].buswidth;
+	chip->numblocks = nand_ids[i].numblocks;
+
+	return 0;
+}
+
+static void nand_info_init(struct nand_info *nand, struct nand_chip *chip)
+{
+	/* number of blocks in device */
+	nand->numblocks = chip->numblocks;
+	/* number of data bytes in a block */
+	nand->blocksize = chip->blocksize;
+	/* number of bytes in page area */
+	nand->pagesize = chip->pagesize;
+	/* number of pages in block */
+	nand->pages_block = div(nand->blocksize, nand->pagesize);
+	/* number of pages in device */
+	nand->pages_device = nand->numblocks * nand->pages_block;
+	/* number of bytes in oob area */
+	nand->oobsize = chip->oobsize;
+	/* Total number of bytes in a sector */
+	nand->sectorsize = nand->pagesize + nand->oobsize;
+	/* the layout of the spare area */
+	config_nand_ooblayout(&nand_oob_layout, chip);
+	nand->ecclayout = &nand_oob_layout;
+	/* data bus width (8/16 bits) */
+	nand->buswidth = chip->buswidth;
+	if (nand->buswidth) {
+		nand->ecclayout->badblockpos *= 2;
+		nand->command = nand_command16;
+		nand->address = nand_address16;
+	} else {
+		nand->command = nand_command;
+		nand->address = nand_address;
+	}
+}
+
+static void nandflash_reset(void)
+{
+	nand_cs_enable();
+
+	nand_command(CMD_RESET);
+
+	nand_wait_ready();
+
+	nand_cs_disable();
+}
+
+static int nandflash_get_type(struct nand_info *nand)
+{
+	struct nand_chip *chip = &nand_chip_default;
+
+	nandflash_reset();
+
+#ifdef CONFIG_ONFI_DETECT_SUPPORT
+	int ret;
+
+	/* Check if the Nandflash is ONFI compliant */
+	ret = nandflash_detect_onfi(chip);
+	if (ret == -1) {
+		if (nandflash_detect_non_onfi(chip)) {
+			dbg_info("NAND: Not find support device!\n");
+			return -1;
+		}
+	}
+#else
+	if (nandflash_detect_non_onfi(chip)) {
+		dbg_info("NAND: Not find support device!\n");
+		return -1;
+	}
+#endif
+
+#ifdef CONFIG_USE_ON_DIE_ECC_SUPPORT
+	if (nand_init_on_die_ecc())
+		return -1;
+#endif
+
+	nand_info_init(nand, chip);
+	
+	return 0;
+}
+
+static void write_column_address(struct nand_info *nand,
+				unsigned int column_address)
+{
+	volatile unsigned int page_size = nand->pagesize;
+
+	if (nand->buswidth)
+		column_address >>= 1;
+
+	while (page_size > 2) {
+		nand->address(column_address & 0xff);
+
+		page_size >>= 8;
+		column_address >>= 8;
+	}
+}
+
+static void write_row_address(struct nand_info *nand,
+				unsigned int row_address)
+{
+	volatile unsigned int num_pages = nand->pages_device;
+
+	while(num_pages) {
+		nand->address(row_address & 0xff);
+
+		num_pages >>= 8;
+		row_address >>= 8;
+	}
+}
+
+static int nand_read_status(void)
+{
+	unsigned int timeout = 1000;
+	unsigned char status;
+
+	do {
+		nand_command(CMD_STATUS);
+		status = read_byte();
+		if (status & STATUS_READY)
+			break;
+	} while (--timeout);
+
+	if (!timeout)
+		return -1;
+
+#ifdef CONFIG_ON_DIE_ECC
+	if (status & STATUS_ERROR) {
+		dbg_info("WARNING: Read On-Die ECC error\n");
+		return -1;
+	}
+#endif
+
+	return 0;
+}
+
+#ifdef CONFIG_NANDFLASH_SMALL_BLOCKS
+static int nand_read_sector(struct nand_info *nand, 
+			unsigned int row_address,
+			unsigned char *buffer,
+			unsigned int zone_flag)
+{
+	unsigned int readbytes, i;
+	unsigned int column_address;
+	unsigned char command;
+
+	switch (zone_flag) {
+	case ZONE_DATA:
+		readbytes = nand->pagesize;
+		column_address = 0x00;
+		command = CMD_READ_A0;
+		break;
+
+	case ZONE_INFO:
+		readbytes = nand->oobsize;
+		column_address = nand->pagesize;
+		buffer += nand->pagesize;
+		command = CMD_READ_C;
+		break;
+
+	case ZONE_DATA | ZONE_INFO:
+		readbytes = nand->sectorsize;
+		column_address = 0x00;
+		command = CMD_READ_A0;
+		break;
+
+	default:
+		return -1;
+	}
+
+	nand_cs_enable();
+
+	/* Write specific command, Read from start */
+	nand->command(command);
+
+	write_column_address(nand, column_address);
+	write_row_address(nand, row_address);
+
+	if (nand_read_status())
+		return -1;
+
+	nand->command(CMD_READ_A0);
+
+	/* Read loop */
+	if (nand->buswidth) {
+		for (i = 0; i < readbytes / 2; i++) {
+			*((short *)buffer) = read_word();
+			buffer += 2;
+		}
+	} else {
+		for (i = 0; i < readbytes; i++) {
+			*buffer = read_byte();
+			buffer++;
+		}
+	}
+
+	nand_cs_disable();
+
+	return 0;
+}
+#else /* large blocks */
+static int nand_read_sector(struct nand_info *nand,
+				unsigned int row_address,
+				unsigned char *buffer, 
+				unsigned int zone_flag)
+{
+	unsigned int readbytes, i;
+	unsigned int column_address;
+	int ret = 0;
+	unsigned char *pbuf = buffer;
+
+#ifdef CONFIG_USE_PMECC
+	unsigned int usepmecc = 0;
+
+	if ((zone_flag & ZONE_DATA) == ZONE_DATA) {
+		usepmecc = 1;
+		zone_flag = ZONE_DATA | ZONE_INFO;
+
+		pmecc_enable();
+	}
+#endif	/* #ifdef CONFIG_USE_PMECC */
+
+	switch (zone_flag) {
+	case ZONE_DATA:
+		readbytes = nand->pagesize;
+		column_address = 0x00;
+		break;
+
+	case ZONE_INFO:
+		readbytes = nand->oobsize;
+		pbuf += nand->pagesize;
+		column_address = nand->pagesize;
+		break;
+
+	case ZONE_DATA | ZONE_INFO:
+		readbytes = nand->sectorsize;
+		column_address = 0x00;
+		break;
+
+	default:
+		return -1;
+	}
+
+	nand_cs_enable();
+
+	nand->command(CMD_READ_1);
+
+	write_column_address(nand, column_address);
+	write_row_address(nand, row_address);
+
+	nand->command(CMD_READ_2);
+
+	if (nand_read_status())
+		return -1;
+
+	nand->command(CMD_READ_1);
+
+#ifdef CONFIG_USE_PMECC
+	if (usepmecc)
+		pmecc_start_data_phase();
+#endif
+	/* Read loop */
+	if (nand->buswidth) {
+		for (i = 0; i < readbytes / 2; i++) {
+			*((short *)pbuf) = read_word();
+			pbuf += 2;
+		}
+	} else {
+		for (i = 0; i < readbytes; i++)
+			*pbuf++ = read_byte();
+
+#ifdef CONFIG_USE_PMECC
+		if (usepmecc)
+			ret = pmecc_process(nand, buffer);
+#endif
+	}
+
+	nand_cs_disable();
+
+	return ret;
+}
+#endif /* #ifdef CONFIG_NANDFLASH_SMALL_BLOCKS */
+
+static int nand_check_badblock(struct nand_info *nand,
+				unsigned int block,
+				unsigned char *buffer)
+{
+	unsigned int page;
+	unsigned int row_address = block * nand->pages_block;
+
+	/*
+	 * Read the first page and second page oob zone
+	 * to detect if block is bad
+	 */
+	for (page = 0; page < 2; page++) {
+		nand_read_sector(nand, row_address + page, buffer, ZONE_INFO);
+		if (*(buffer + nand->pagesize + nand->ecclayout->badblockpos)
+			!= 0xff)
+			return -1;
+	}
+
+	return 0;
+}
+
+#ifdef CONFIG_ENABLE_SW_ECC
+static void nand_read_ecc(struct nand_ooblayout *ooblayout,
+				unsigned char *buffer,
+				unsigned char *ecc)
+{
+	unsigned int i;
+
+	for (i = 0; i < ooblayout->eccbytes; i++)
+		ecc[i] = buffer[ooblayout->eccpos[i]];
+}
+#endif
+
+static int nand_read_page(struct nand_info *nand,
+				unsigned int block,
+				unsigned int page,
+				unsigned int zone_flag,
+				unsigned char *buffer)
+{
+	unsigned int row_address = block * nand->pages_block + page;
+
+#ifndef CONFIG_ENABLE_SW_ECC
+	return nand_read_sector(nand, row_address, buffer, ZONE_DATA);
+#else
+
+	int retval;
+	unsigned char hamming[48], error;
+
+	retval = nand_read_sector(nand, row_address, buffer,
+				ZONE_DATA | ZONE_INFO);
+	if (retval)
+		return -1;
+
+	nand_read_ecc(nand->ecclayout, buffer + nand->pagesize, hamming);
+
+	error = Hamming_Verify256x(buffer, nand->pagesize, hamming);
+	if (error && (error != Hamming_ERROR_SINGLEBIT)) {
+		dbg_info("NAND: Hamming ECC error!\n");
+		return -1;
+	}
+
+	return 0;
+#endif /* #ifndef CONFIG_ENABLE_SW_ECC */
+}
+
+#ifdef CONFIG_NANDFLASH_RECOVERY
+static int nand_erase_block0(struct nand_info *nand)
+{
+	unsigned int row_address = 0;
+	unsigned int timeout = 10000;
+	unsigned int status;
+
+	nand_cs_enable();
+
+	nand_command(CMD_ERASE_1);
+	write_row_address(nand, row_address);
+	nand_command(CMD_ERASE_2);
+
+	udelay(2000);
+
+	nand_command(CMD_STATUS);
+	while ((!((status = read_byte()) & STATUS_READY)) && --timeout)
+		;
+
+	nand_cs_disable();
+
+	if (status & STATUS_ERROR)
+		return -1;
+
+	if (timeout == 0)
+		return -2;
+
+	return 0;
+}
+
+static int nandflash_recovery(struct nand_info *nand)
+{
+	int ret = -1;
+
+	/*
+	 * If Recovery Button is pressed during boot sequence,
+	 * erase nandflash block0
+	*/
+	dbg_info("NAND: Press the recovery button (%s) to recovery\n",
+			RECOVERY_BUTTON_NAME);
+
+	if ((pio_get_value(CONFIG_SYS_RECOVERY_BUTTON_PIN)) == 0) {
+		dbg_info("NAND: The recovery button (%s) has been "\
+				"pressed\n", RECOVERY_BUTTON_NAME);
+		dbg_info("NAND: The block 0 is erasing ...\n");
+
+		ret = nand_erase_block0(nand);
+		if (ret)
+			dbg_info("NAND: The erasing failed\n");
+		else
+			dbg_info("NAND: The erasing is done\n");
+	}
+
+	return ret;
+}
+#endif /* #ifdef CONFIG_NANDFLASH_RECOVERY */
+
+static int nand_loadimage(struct nand_info *nand,
+				unsigned int offset,
+				unsigned int length,
+				unsigned char *dest)
+{
+	unsigned char *buffer = dest;
+	unsigned int readsize;
+	unsigned int block = 0;
+	unsigned int page;
+	unsigned int start_page = 0;
+	unsigned int end_page;
+	unsigned int numpages = 0;
+	unsigned int offsetpage = 0;
+	int ret;
+
+	division(offset, nand->blocksize, &block, &start_page);
+	start_page = div(start_page, nand->pagesize);
+
+	while (length > 0) {
+		/* read a buffer corresponding to a block */
+		if (length < nand->blocksize)
+			readsize = length;
+		else
+			readsize = nand->blocksize;
+
+		/* adjust the number of pages to read */
+		division(readsize, nand->pagesize, &numpages, &offsetpage);
+		if (offsetpage)
+			numpages++;
+
+		end_page = start_page + numpages;
+
+		/* check the bad block */
+		while (1) {
+			if (nand_check_badblock(nand,
+					block, buffer) != 0) {
+				block++; /* skip this block */
+				dbg_info("NAND: Bad block:" \
+					" #%d\n", block);
+			} else
+				break;
+		}
+
+		/* read pages of a block */
+		for (page = start_page; page < end_page; page++) {
+			ret = nand_read_page(nand, block, page,
+						ZONE_DATA, buffer);
+			if (ret)
+				return -1;
+			else
+				buffer += nand->pagesize;
+		}
+		length -= readsize;
+
+		block++;
+		start_page = 0;
+	}
+
+	return 0;
+}
+
+#if defined(CONFIG_LOAD_LINUX) || defined(CONFIG_LOAD_ANDROID)
+
+static int update_image_length(struct nand_info *nand,
+				unsigned int offset,
+				unsigned char *dest,
+				unsigned char flag)
+{
+	unsigned int length = nand->pagesize;
+	int ret;
+
+	ret = nand_loadimage(nand, offset, length, dest);
+	if (ret)
+		return -1;
+
+	if (flag == KERNEL_IMAGE)
+		return kernel_size(dest);
+#ifdef CONFIG_OF_LIBFDT
+	else
+		return of_get_dt_total_size((void *)dest);
+#else
+	return -1;
+#endif
+}
+#endif
+
+int load_nandflash(struct image_info *image)
+{
+	struct nand_info nand;
+	int ret;
+
+	nandflash_hw_init();
+
+	if (nandflash_get_type(&nand))
+		return -1;
+
+#ifdef CONFIG_NANDFLASH_RECOVERY
+	if (nandflash_recovery(&nand) == 0)
+		return -2;
+#endif
+
+#ifdef CONFIG_USE_PMECC
+	if (init_pmecc(&nand))
+		return -1;
+#endif
+
+#ifdef CONFIG_ENABLE_SW_ECC
+	dbg_info("NAND: Using Software ECC\n");
+#endif
+
+#if defined(CONFIG_LOAD_LINUX) || defined(CONFIG_LOAD_ANDROID)
+	int length = update_image_length(&nand,
+				image->offset, image->dest, KERNEL_IMAGE);
+	if (length == -1)
+		return -1;
+
+	image->length = length;
+#endif
+
+	dbg_info("NAND: Image: Copy %d bytes from %d to %d\n",
+			image->length, image->offset, image->dest);
+
+	ret = nand_loadimage(&nand, image->offset, image->length, image->dest);
+	if (ret)
+		return ret;
+
+	if (image->of) {
+#if defined(CONFIG_LOAD_LINUX) || defined(CONFIG_LOAD_ANDROID)
+		length = update_image_length(&nand,
+				image->of_offset, image->of_dest, DT_BLOB);
+		if (length == -1)
+			return -1;
+
+		image->of_length = length;
+#endif
+
+		dbg_info("NAND: dt blob: Copy %d bytes from %d to %d\n",
+			image->of_length, image->of_offset, image->of_dest);
+
+		ret = nand_loadimage(&nand, image->of_offset,
+					image->of_length, image->of_dest);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+ }

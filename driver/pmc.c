@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- *         ATMEL Microcontroller Software Support  -  ROUSSET  -
+ *         ATMEL Microcontroller Software Support
  * ----------------------------------------------------------------------------
  * Copyright (c) 2006, Atmel Corporation
 
@@ -24,161 +24,224 @@
  * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- * ----------------------------------------------------------------------------
- * File Name           : pmc.c
- * Object              :
- * Creation            : ODi Apr 24th 2006
- *-----------------------------------------------------------------------------
  */
-#include "../include/pmc.h"
-#include "../include/part.h"
-#include "../include/main.h"
+#include "hardware.h"
+#include "arch/at91_pmc.h"
 
-/* Write PMC register */
 static inline void write_pmc(unsigned int offset, const unsigned int value)
 {
-    writel(value, offset + AT91C_BASE_PMC);
+	writel(value, offset + AT91C_BASE_PMC);
 }
 
-/* Read PMC registers */
 static inline unsigned int read_pmc(unsigned int offset)
 {
-    return readl(offset + AT91C_BASE_PMC);
+	return readl(offset + AT91C_BASE_PMC);
 }
 
 void lowlevel_clock_init()
 {
-#if defined(CONFIG_AT91SAM9X5EK)
-    unsigned long tmp;
+	unsigned long tmp;
+	unsigned int times;
 
-    tmp = read_pmc(PMC_MCKR);
-    tmp &= ~AT91C_PMC_CSS;
-    tmp |= AT91C_PMC_CSS_MAIN_CLK;
-    write_pmc(PMC_MCKR, tmp);
-    while (!(read_pmc(PMC_SR) & AT91C_PMC_MCKRDY))
-        ;
+#if defined(AT91SAM9X5) || defined(AT91SAM9N12) || defined(SAMA5D3X)
+	/*
+	 * Enable the 12MHz oscillator
+	 * tST_max = 2ms
+	 * Startup Time: 32768 * 2ms / 8 = 8
+	 */
+	tmp = read_pmc(PMC_MOR);
+	tmp &= (~AT91C_CKGR_MOSCXTST);
+	tmp &= (~AT91C_CKGR_KEY);
+	tmp |= AT91C_CKGR_MOSCXTEN;
+	tmp |= AT91_CKGR_MOSCXTST_SET(8);
+	tmp |= AT91C_CKGR_PASSWD;
+	write_pmc(PMC_MOR, tmp);
 
-    if (!(read_pmc(PMC_SR) & AT91C_PMC_MOSCXTS)) {
-        /*
-         * Enable 12MHz Main Oscillator 
-         */
-        write_pmc(PMC_MOR,
-                  (0x37 << 16) | AT91C_CKGR_MOSCXTEN | (0x40 << 8) |
-                  AT91C_CKGR_MOSCSEL | AT91C_CKGR_MOSCRCEN);
+	times = 1000;
+	while ((times--) && (!(read_pmc(PMC_SR) & AT91C_PMC_MOSCXTS)))
+		;
 
-        /*
-         * Wait until 12MHz Main Oscillator is stable 
-         */
-        while (!(read_pmc(PMC_SR) & AT91C_PMC_MOSCXTS))
-            ;
-    }
+	/* Switch from internal 12MHz RC to the 12MHz oscillator */
+	tmp = read_pmc(PMC_MOR);
+	tmp &= (~AT91C_CKGR_MOSCXTBY);
+	tmp &= (~AT91C_CKGR_KEY);
+	tmp |= AT91C_CKGR_PASSWD;
+	write_pmc(PMC_MOR, tmp);
+
+	tmp = read_pmc(PMC_MOR);
+	tmp |= AT91C_CKGR_MOSCSEL;
+	tmp &= (~AT91C_CKGR_KEY);
+	tmp |= AT91C_CKGR_PASSWD;
+	write_pmc(PMC_MOR, tmp);
+
+	times = 1000;
+	while ((times--) && (!(read_pmc(PMC_SR) & AT91C_PMC_MOSCSELS)))
+		;
+
+	/* Disable the 12MHz RC oscillator */
+	tmp = read_pmc(PMC_MOR);
+	tmp &= (~AT91C_CKGR_MOSCRCEN);
+	tmp &= (~AT91C_CKGR_KEY);
+	tmp |= AT91C_CKGR_PASSWD;
+	write_pmc(PMC_MOR, tmp);
+
 #else
-    if (!(read_pmc(PMC_SR) & AT91C_PMC_MOSCS)) {
-        /*
-         * Enable 12MHz Main Oscillator 
-         */
-        write_pmc(PMC_MOR, AT91C_CKGR_MOSCEN | (0x40 << 8));
+	/*
+	 * Enable the 12MHz oscillator
+	 * tST_max = 2ms
+	 * Startup Time: 32768 * 2ms / 8 = 8
+	 */
+	tmp = read_pmc(PMC_MOR);
+	tmp &= (~AT91C_CKGR_MOSCXTST);
+	tmp |= AT91C_CKGR_MOSCXTEN;
+	tmp |= AT91_CKGR_MOSCXTST_SET(8);
+	write_pmc(PMC_MOR, tmp);
 
-        /*
-         * Wait until 12MHz Main Oscillator is stable 
-         */
-        while (!(read_pmc(PMC_SR) & AT91C_PMC_MOSCS))
-            ;
-    }
-    /*
-     * After stablization, switch to 12MHz Main Oscillator 
-     */
-    if ((read_pmc(PMC_MCKR) & AT91C_PMC_CSS) == AT91C_PMC_CSS_SLOW_CLK) {
-        unsigned long tmp;
-
-        tmp = read_pmc(PMC_MCKR);
-        tmp &= ~AT91C_PMC_CSS;
-        tmp |= AT91C_PMC_CSS_MAIN_CLK;
-        write_pmc(PMC_MCKR, tmp);
-        while (!(read_pmc(PMC_SR) & AT91C_PMC_MCKRDY))
-            ;
-
-        tmp &= ~AT91C_PMC_PRES;
-        tmp |= AT91C_PMC_PRES_CLK;
-        write_pmc(PMC_MCKR, tmp);
-        while (!(read_pmc(PMC_SR) & AT91C_PMC_MCKRDY))
-            ;
-    }
+	times = 1000;
+	while ((times--) && (!(read_pmc(PMC_SR) & AT91C_PMC_MOSCXTS)))
+		;
 #endif
 
-    return;
+	/* After stablization, switch to Main Oscillator */
+	if ((read_pmc(PMC_MCKR) & AT91C_PMC_CSS) == AT91C_PMC_CSS_SLOW_CLK) {
+		tmp = read_pmc(PMC_MCKR);
+		tmp &= ~AT91C_PMC_CSS;
+		tmp |= AT91C_PMC_CSS_MAIN_CLK;
+		write_pmc(PMC_MCKR, tmp);
+
+		times = 1000;
+		while ((times--) && (!(read_pmc(PMC_SR) & AT91C_PMC_MCKRDY)))
+			;
+
+		tmp &= ~AT91C_PMC_PRES;
+		tmp |= AT91C_PMC_PRES_CLK;
+		write_pmc(PMC_MCKR, tmp);
+
+		times = 1000;
+		while ((times--) && (!(read_pmc(PMC_SR) & AT91C_PMC_MCKRDY)))
+			;
+	}
+
+	return;
 }
 
-//*----------------------------------------------------------------------------
-//* \fn    pmc_cfg_plla
-//* \brief Configure the pll frequency to the corresponding value.
-//*----------------------------------------------------------------------------*/
+void pmc_init_pll(unsigned int pmc_pllicpr)
+{
+	write_pmc(PMC_PLLICPR, pmc_pllicpr);
+}
+
 int pmc_cfg_plla(unsigned int pmc_pllar, unsigned int timeout)
 {
-#if defined(CONFIG_AT91SAM9X5EK)
-    write_pmc(PMC_PLLAR, 0);
-    write_pmc(PMC_PLLAR, pmc_pllar);
-    //while ((timeout--) && !(read_pmc(PMC_SR) & AT91C_PMC_LOCKA))
-    while (!(read_pmc(PMC_SR) & AT91C_PMC_LOCKA))
-        ;
-    while (!(read_pmc(PMC_SR) & AT91C_PMC_MCKRDY))
-        ;
+	write_pmc((unsigned int)PMC_PLLAR, pmc_pllar);
 
-    return 0;
-#else
-    write_pmc((unsigned int)PMC_PLLAR, pmc_pllar);
-
-    while ((timeout--) && !(read_pmc(PMC_SR) & AT91C_PMC_LOCKA))
-        ;
-    return (timeout) ? 0 : (-1);
-#endif
+	while ((timeout--) && !(read_pmc(PMC_SR) & AT91C_PMC_LOCKA)) ;
+	return (timeout) ? 0 : (-1);
 }
 
-//*----------------------------------------------------------------------------
-//* \fn    pmc_cfg_pllb
-//* \brief Configure the pll frequency to the corresponding value.
-//*----------------------------------------------------------------------------*/
 #ifndef PLLUTMI
 int pmc_cfg_pllb(unsigned int pmc_pllbr, unsigned int timeout)
 {
-    write_pmc(PMC_PLLBR, pmc_pllbr);
+	write_pmc(PMC_PLLBR, pmc_pllbr);
+	while ((timeout--) && !(read_pmc(PMC_SR) & AT91C_PMC_LOCKB)) ;
 
-    while ((timeout--) && !(read_pmc(PMC_SR) & AT91C_PMC_LOCKB))
-        ;
-
-    return (timeout) ? 0 : (-1);
+	return (timeout) ? 0 : (-1);
 }
 #else
 int pmc_cfg_pllutmi(unsigned int pmc_pllutmi, unsigned int timeout)
 {
-    return 0;
+	return 0;
 }
 #endif
 
-//*----------------------------------------------------------------------------
-//* \fn    pmc_cfg_mck
-//* \brief Configure the main oscillator to the corresponding value.
-//*----------------------------------------------------------------------------*/
 int pmc_cfg_mck(unsigned int pmc_mckr, unsigned int timeout)
 {
-    write_pmc(PMC_MCKR, pmc_mckr);
+	unsigned int tmp;
+	unsigned int times;
 
-    while (!(read_pmc(PMC_SR) & AT91C_PMC_MCKRDY))
-        ;
+	/*
+	 * Program the PRES field in the PMC_MCKR register,
+	 * wait for MCKRDY bit to be set in the PMC_SR register
+	 */
+	tmp = read_pmc(PMC_MCKR);
+#if defined(AT91SAM9X5) || defined(AT91SAM9N12) || defined(SAMA5D3X)
+	tmp &= (~AT91C_PMC_ALT_PRES);
+	tmp |= (pmc_mckr & AT91C_PMC_ALT_PRES);
+#else
+	tmp &= (~AT91C_PMC_PRES);
+	tmp |= (pmc_mckr & AT91C_PMC_PRES);
+#endif
+	write_pmc(PMC_MCKR, tmp);
 
-    return (timeout) ? 0 : (-1);
+	times = timeout;
+	while ((times--) && (!(read_pmc(PMC_SR) & AT91C_PMC_MCKRDY)))
+		;
+
+	/*
+	 * Program the MDIV field in the PMC_MCKR register,
+	 * wait for MCKRDY bit to be set in the PMC_SR register
+	 */
+	tmp = read_pmc(PMC_MCKR);
+	tmp &= (~AT91C_PMC_MDIV);
+	tmp |= (pmc_mckr & AT91C_PMC_MDIV);
+	write_pmc(PMC_MCKR, tmp);
+
+	times = timeout;
+	while ((times--) && (!(read_pmc(PMC_SR) & AT91C_PMC_MCKRDY)))
+		;
+
+	/*
+	 * Program the PLLADIV2 field in the PMC_MCKR register,
+	 * wait for MCKRDY bit to be set in the PMC_SR register
+	 */
+	tmp = read_pmc(PMC_MCKR);
+	tmp &= (~AT91C_PMC_PLLADIV2);
+	tmp |= (pmc_mckr & AT91C_PMC_PLLADIV2);
+	write_pmc(PMC_MCKR, tmp);
+
+	times = timeout;
+	while ((times--) && (!(read_pmc(PMC_SR) & AT91C_PMC_MCKRDY)))
+		;
+
+	/*
+	 * Program the CSS field in the PMC_MCKR register,
+	 * wait for MCKRDY bit to be set in the PMC_SR register
+	 */
+	tmp = read_pmc(PMC_MCKR);
+	tmp &= (~AT91C_PMC_CSS);
+	tmp |= (pmc_mckr & AT91C_PMC_CSS);
+	write_pmc(PMC_MCKR, tmp);
+
+	times = timeout;
+	while ((times--) && (!(read_pmc(PMC_SR) & AT91C_PMC_MCKRDY)))
+		;
+
+	return 0;
 }
 
-//*----------------------------------------------------------------------------
-//* \fn    pmc_cfg_pck
-//* \brief Configure the PCK frequency to the corresponding value.
-//*----------------------------------------------------------------------------*/
 int pmc_cfg_pck(unsigned char x, unsigned int clk_sel, unsigned int prescaler)
 {
-    write_pmc(PMC_PCKR + x * 4, clk_sel | prescaler);
-    write_pmc(PMC_SCER, 1 << (x + 8));
-    while (!(read_pmc(PMC_SR) & (1 << (x + 8))))
-        ;
+	write_pmc(PMC_PCKR + x * 4, clk_sel | prescaler);
+	write_pmc(PMC_SCER, 1 << (x + 8));
+	while (!(read_pmc(PMC_SR) & (1 << (x + 8)))) ;
 
-    return 0;
+	return 0;
+}
+
+int pmc_enable_periph_clock(unsigned int periph_id)
+{
+	unsigned int mask = 0x01 << (periph_id % 32);
+
+	if ((periph_id / 32) == 1)
+		write_pmc(PMC_PCER1, mask);
+	else if ((periph_id / 32) == 0)
+		write_pmc(PMC_PCER, mask);
+	else
+		return -1;
+
+	return 0;
+}
+
+void pmc_enable_system_clock(unsigned int clock_id)
+{
+	 write_pmc(PMC_SCER, clock_id);
 }

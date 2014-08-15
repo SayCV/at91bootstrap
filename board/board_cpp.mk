@@ -1,18 +1,22 @@
 CPPFLAGS += \
-	-D$(CHIP) 				\
-	-D$(BOARD)				\
+	-D$(BOARDNAME)				\
 	-DMACH_TYPE=$(MACH_TYPE) 		\
 	-DTOP_OF_MEMORY=$(TOP_OF_MEMORY)	\
 	-D$(CRYSTAL)
 
 ASFLAGS += \
-	-D$(CHIP)				\
-	-D$(BOARD)				\
+	-D$(BOARDNAME)				\
 	-DMACH_TYPE=$(MACH_TYPE) 		\
 	-DTOP_OF_MEMORY=$(TOP_OF_MEMORY)	\
 	-D$(CRYSTAL)
 
-include	board/$(BOARD)/board.mk
+include board/chips.mk
+
+ifeq (board/$(BOARDNAME)/board.mk, $(wildcard board/$(BOARDNAME)/board.mk))
+include	board/$(BOARDNAME)/board.mk
+else
+$(warning WARNING: *** file: board/$(BOARDNAME)/board.mk are not found!)
+endif
 
 ifeq ($(CONFIG_THUMB),y)
 CPPFLAGS += -DCONFIG_THUMB -mthumb -mthumb-interwork
@@ -21,10 +25,6 @@ endif
 
 ifeq ($(CONFIG_SCLK),y)
 CPPFLAGS += -DCONFIG_SCLK
-endif
-
-ifeq ($(CONFIG_LOAD_NK),y)
-CPPFLAGS += -DCONFIG_LOAD_NK
 endif
 
 # Crystal frequency
@@ -67,8 +67,24 @@ ifeq ($(CONFIG_CPU_CLK_266MHZ),y)
 CPPFLAGS += -DCONFIG_CPU_CLK_266MHZ
 endif
 
+ifeq ($(CONFIG_CPU_CLK_332MHZ),y)
+CPPFLAGS += -DCONFIG_CPU_CLK_332MHZ
+endif
+
+ifeq ($(CONFIG_CPU_CLK_396MHZ),y)
+CPPFLAGS += -DCONFIG_CPU_CLK_396MHZ
+endif
+
 ifeq ($(CONFIG_CPU_CLK_400MHZ),y)
 CPPFLAGS += -DCONFIG_CPU_CLK_400MHZ
+endif
+
+ifeq ($(CONFIG_CPU_CLK_498MHZ),y)
+CPPFLAGS += -DCONFIG_CPU_CLK_498MHZ
+endif
+
+ifeq ($(CONFIG_CPU_CLK_528MHZ),y)
+CPPFLAGS += -DCONFIG_CPU_CLK_528MHZ
 endif
 
 # Bus speed
@@ -89,10 +105,20 @@ ifeq ($(CONFIG_BUS_SPEED_133MHZ),y)
 CPPFLAGS += -DCONFIG_BUS_SPEED_133MHZ
 endif
 
+ifeq ($(CONFIG_BUS_SPEED_166MHZ),y)
+CPPFLAGS += -DCONFIG_BUS_SPEED_166MHZ
+endif
+
+# other
+
 ifeq ($(CONFIG_HAS_PIO3),y)
 CPPFLAGS += -DCONFIG_HAS_PIO3
 endif
 
-ifeq ($(CPU_HAS_PMECC),y)
-CPPFLAGS += -DCPU_HAS_PMECC
+ifeq ($(CONFIG_LOAD_ONE_WIRE), y)
+CPPFLAGS += -DCONFIG_LOAD_ONE_WIRE
+endif
+
+ifeq ($(CONFIG_MMC_SUPPORT), y)
+CPPFLAGS += -DCONFIG_MMC_SUPPORT
 endif
