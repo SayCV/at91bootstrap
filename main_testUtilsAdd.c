@@ -67,8 +67,8 @@ int testUtils(void) {
 	usart_puts("---------------------------------\n\r");
 	usart_puts("---------------------------------\n\r");
 	usart_puts("-- Applet -- Utils Test Done\n\r");
-	TRACE_INFO("---------------------------------\n\r");
-	TRACE_INFO("---------------------------------\n\r");
+	usart_puts("---------------------------------\n\r");
+	usart_puts("---------------------------------\n\r");
 	
 	return testResult;
 }

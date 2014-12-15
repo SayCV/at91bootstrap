@@ -141,8 +141,8 @@ int main(void)
 	/* User Test Utils Start */
 	int testUtils(void);
 	if( testUtils() ) {
-		TRACE_INFO("-- Applet %s -- Utils Test at DebugModel.\n\r", SAM_BA_APPLETS_VERSION);
-		goto exit;
+		usart_puts("-- Applet -- Utils Test at DebugModel -- Will hangs up here for ever.\n\r");
+		while (1);
 	}
 	/* User Test Utils End */
 	
