@@ -123,6 +123,9 @@ void nandflash_hw_disable(void)
 	writel(reg, AT91C_BASE_CCFG + CCFG_EBICSA);
 }
 
+#define SMC_MODE_DBW_Pos 12
+#define SMC_MODE_DBW_Msk (0x3u << SMC_MODE_DBW_Pos) /**< \brief (SMC_MODE) Data Bus Width */
+#define SMC_MODE_DBW(value) ((SMC_MODE_DBW_Msk & ((value) << SMC_MODE_DBW_Pos)))
 void at91_smc_init(int cs, int width)
 {
 /* Configure SMC CS0 */
@@ -145,7 +148,7 @@ void at91_smc_init(int cs, int width)
 	writel((AT91C_SMC_READMODE
 		| AT91C_SMC_WRITEMODE
 		| AT91C_SMC_NWAITM_NWAIT_DISABLE
-		| AT91C_SMC_DBW(div(width, AT91C_SMC_DBW_WIDTH_BITS_16))
+		| SMC_MODE_DBW(div(width, 16))
 		| AT91_SMC_TDF_(5)),
 		AT91C_BASE_SMC + SMC_CTRL0 + 0x10*cs);
 }
@@ -173,7 +176,7 @@ void norflash_smc_init(int width)
 	writel((AT91C_SMC_READMODE
 		| AT91C_SMC_WRITEMODE
 		| AT91C_SMC_NWAITM_NWAIT_DISABLE
-		| AT91C_SMC_DBW(div(width, AT91C_SMC_DBW_WIDTH_BITS_16))
+		| SMC_MODE_DBW(div(width, 16))
 		| AT91_SMC_TDF_(5)),
 		AT91C_BASE_SMC + SMC_CTRL3);
 }

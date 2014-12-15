@@ -57,7 +57,7 @@ void testDDR2(void) {
 	}
 	
 	base_addr = BOARD_DDR2_ADDR;
-	pResult = memTestAddressBus(base_addr, BOARD_DDR2_BYTES/128);
+	pResult = memTestAddressBus(base_addr, BOARD_DDR2_BYTES);
 	if(pResult == NULL) {
 		usart_puts("----- DDR2 TestAddressBus() succeeds\n\r");
 	} else {
@@ -67,7 +67,7 @@ void testDDR2(void) {
 	}
 	
 	base_addr = BOARD_DDR2_ADDR;
-	pResult = memTestDevice(base_addr, BOARD_DDR2_BYTES/128);
+	pResult = memTestDevice(base_addr, BOARD_DDR2_BYTES);
 	if(pResult == NULL) {
 		usart_puts("----- DDR2 memTestDevice() succeeds\n\r");
 	} else {
