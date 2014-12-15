@@ -20,4 +20,5 @@ binaries
 *.orig
 *.o
 tags
+*.bak
 *.swp

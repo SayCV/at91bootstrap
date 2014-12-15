@@ -183,7 +183,12 @@ ifeq ($(SYMLINK),)
 SYMLINK=at91bootstrap.bin
 endif
 
+ifeq ($(CONFIG_DEBUG_HARDWARE), y)
+$(echo "Make for DEBUG HARDWARE!!!")
+COBJS-y:= $(TOPDIR)/main_testUtils.o $(TOPDIR)/main_testUtilsAdd.o $(TOPDIR)/board/$(BOARDNAME)/$(BOARDNAME).o
+else
 COBJS-y:= $(TOPDIR)/main.o $(TOPDIR)/board/$(BOARDNAME)/$(BOARDNAME).o
+endif
 SOBJS-y:= $(TOPDIR)/crt0_gnu.o
 
 include	lib/libc.mk
