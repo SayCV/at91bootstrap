@@ -1,15 +1,23 @@
 
 #include "common.h"
 #include "hardware.h"
-#include "board.h"
+#include "arch/at91_ccfg.h"
+#include "arch/at91_rstc.h"
+#include "arch/at91_pmc.h"
+#include "arch/at91_smc.h"
+#include "arch/at91_pio.h"
+#include "arch/at91_ddrsdrc.h"
+#include "gpio.h"
+#include "pmc.h"
 #include "usart.h"
 #include "debug.h"
+#include "ddramc.h"
 #include "slowclk.h"
-#include "dataflash.h"
-#include "nandflash.h"
-#include "sdcard.h"
-#include "flash.h"
+#include "timer.h"
+#include "watchdog.h"
 #include "string.h"
+#include "at91sam9x5ek.h"
+
 #include "onewire_info.h"
 
 typedef unsigned short uint16_t;
@@ -85,7 +93,7 @@ int testUtils(void) {
 	return testResult;
 }
 
-void nandflash_hw_enable(void)
+void nandflash_hw_enable(void) {
 	unsigned int reg;
 	
 	reg = readl(AT91C_BASE_CCFG + CCFG_EBICSA);
