@@ -195,6 +195,8 @@ include	lib/libc.mk
 include	driver/driver.mk
 include	fs/src/fat.mk
 
+include	test/libtest.mk
+
 #$(SOBJS-y:.o=.S)
 
 SRCS:= $(COBJS-y:.o=.c)

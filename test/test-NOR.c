@@ -11,6 +11,8 @@
 #include "string.h"
 #include "onewire_info.h"
 
+#include "test.h"
+
 #define BOARD_NORFLASH_ADDR 0x10000000
 
 void testNOR(void) {       

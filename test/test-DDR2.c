@@ -17,7 +17,9 @@
  * http://www.barrgroup.com/Embedded-Systems/How-To/Memory-Test-Suite-C
  */
 
-#include "memtest.c"
+#include "memtest.h"
+
+#include "test.h"
 
 #define BOARD_DDR2_ADDR 0x20000000
 #define BOARD_DDR2_BYTES 128*1024*1024

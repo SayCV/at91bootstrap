@@ -20,8 +20,9 @@
 
 #include "onewire_info.h"
 
-typedef unsigned short uint16_t;
-typedef unsigned int uint32_t;
+#include "usart.h"
+
+#include "test/test.h"
 
 #define VENDOR_DTU_CPU_V1 0
 #define VENDOR_DTU_SP_V1  1
@@ -46,6 +47,7 @@ typedef unsigned int uint32_t;
 
 static int testResult = 0;
 
+/*
 #if defined(DEBUG_DDR2) && DEBUG_DDR2
 #include "test/test-DDR2.c"
 #endif
@@ -65,7 +67,7 @@ static int testResult = 0;
 #if defined(DEBUG_YKYX) && DEBUG_YKYX
 #include "test/test-YKYX.c"
 #endif
-
+*/
 
 int testUtils(void) {
 	//PIO_Configure(pPinsNandFlash, PIO_LISTSIZE(pPinsNandFlash));

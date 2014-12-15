@@ -12,6 +12,8 @@
 #include "string.h"
 #include "onewire_info.h"
 
+#include "test.h"
+
 uint32_t commandAddress, command;
 uint32_t YKYX_BASE = 0x60000000;
 

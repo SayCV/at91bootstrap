@@ -17,6 +17,7 @@
 #ifndef _memtest_h
 #define _memtest_h
 
+#include "test.h"
 
 /*
  * Define NULL pointer value.
@@ -25,10 +26,7 @@
 #define NULL  (void *) 0
 #endif
 
-/*
- * Set the data bus width.
- */
-typedef unsigned long datum;
+
 
 /*
  * Function prototypes.
