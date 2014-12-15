@@ -17,6 +17,10 @@ uint32_t YKYX_BASE = 0x60000000;
 
 void testYKYX(void) {
 	
+	nandflash_hw_disable();
+	//norflash_hw_init();
+	at91_smc_init(DEBUG_NCS5, 16);
+	
 	usart_puts("-- Applet -- Utils Test -- YKYX -> Start\n\r");
 	
 	usart_puts("-- Read All YXs --\n\r");

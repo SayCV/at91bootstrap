@@ -26,6 +26,10 @@ void testNOR(void) {
 	uint32_t query_id2=0;
 	uint32_t query_id3=0;
 	
+	//nandflash_hw_disable();
+	norflash_hw_init();
+	//at91_smc_init(DEBUG_NCS0, 16);
+	
 	/* Here is an example of Autoselect mode (getting manufacturer ID) */
 	/* Auto Select Entry */
 	*( (uint16_t *)base_addr + 0x555 ) = 0x00AA; /* write unlock cycle 1 */
