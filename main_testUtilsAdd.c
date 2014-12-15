@@ -12,6 +12,9 @@
 #include "string.h"
 #include "onewire_info.h"
 
+typedef unsigned short uint16_t;
+typedef unsigned int uint32_t;
+
 #define VENDOR_DTU_CPU_V1 0
 #define VENDOR_DTU_SP_V1  1
 #define VENDOR_NDTU_FA_V1 10

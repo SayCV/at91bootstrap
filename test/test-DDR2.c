@@ -30,16 +30,16 @@ void testDDR2(void) {
 	usart_puts("-- Applet -- Utils Test -- DDR2 -> Start\n\r");
 	
 	//BOARD_ConfigureSdram();
-	BOARD_ConfigureDdram();
+	//BOARD_ConfigureDdram();
 	
 	base_addr = BOARD_DDR2_ADDR;
 	result = memTestDataBus(base_addr);
 	if(result == 0) {
-		usart_puts("-- DDR2 TestDataBus("), 
+		usart_puts("----- DDR2 TestDataBus("), 
 			usart_puts(base_addr), 
 			usart_puts(") succeeds\n\r");
 	} else {
-		usart_puts("-- DDR2 TestDataBus("), 
+		usart_puts("----- DDR2 TestDataBus("), 
 			usart_puts(base_addr), 
 			usart_puts(") failed at first pattern("), 
 			usart_puts(result), 
@@ -49,9 +49,9 @@ void testDDR2(void) {
 	base_addr = BOARD_DDR2_ADDR + BOARD_DDR2_BYTES;
 	result = memTestDataBus(base_addr);
 	if(result == 0) {
-		usart_puts("-- DDR2 TestDataBus() succeeds\n\r");
+		usart_puts("----- DDR2 TestDataBus() succeeds\n\r");
 	} else {
-		usart_puts("-- DDR2 TestDataBus() failed at first pattern("),
+		usart_puts("----- DDR2 TestDataBus() failed at first pattern("),
 			usart_puts(result),
 			usart_puts(")\n\r");
 	}
@@ -59,9 +59,9 @@ void testDDR2(void) {
 	base_addr = BOARD_DDR2_ADDR;
 	pResult = memTestAddressBus(base_addr, BOARD_DDR2_BYTES/128);
 	if(pResult == NULL) {
-		usart_puts("-- DDR2 TestAddressBus() succeeds\n\r");
+		usart_puts("----- DDR2 TestAddressBus() succeeds\n\r");
 	} else {
-		usart_puts("-- DDR2 TestAddressBus() failed at first pattern("),
+		usart_puts("----- DDR2 TestAddressBus() failed at first pattern("),
 			usart_puts(pResult);
 			usart_puts(")\n\r");
 	}
@@ -69,9 +69,9 @@ void testDDR2(void) {
 	base_addr = BOARD_DDR2_ADDR;
 	pResult = memTestDevice(base_addr, BOARD_DDR2_BYTES/128);
 	if(pResult == NULL) {
-		usart_puts("-- DDR2 memTestDevice() succeeds\n\r");
+		usart_puts("----- DDR2 memTestDevice() succeeds\n\r");
 	} else {
-		usart_puts("-- DDR2 TestDataBus() failed at first pattern("),
+		usart_puts("----- DDR2 TestDataBus() failed at first pattern("),
 			usart_puts(pResult);
 			usart_puts(")\n\r");
 	}

@@ -21,16 +21,16 @@ void testYKYX(void) {
 	
 	usart_puts("-- Read All YXs --\n\r");
 	usart_puts("EXNCS1_YX1 - "), 
-		usart_puts(YKYX_BASE + 0), 
-		usart_puts(*(volatile uint16_t *)(YKYX_BASE + 0)), 
+		usart_putint(YKYX_BASE + 0), 
+		usart_putint(*(volatile uint16_t *)(YKYX_BASE + 0)), 
 		usart_puts("\n");
 	usart_puts("EXNCS2_YX2 - "), 
-		usart_puts(YKYX_BASE + 2), 
-		usart_puts(*(volatile uint16_t *)(YKYX_BASE + 2)), 
+		usart_putint(YKYX_BASE + 2), 
+		usart_putint(*(volatile uint16_t *)(YKYX_BASE + 2)), 
 		usart_puts("\n");
 	usart_puts("EXNCS3_YX3 - "), 
-		usart_puts(YKYX_BASE + 4), 
-		usart_puts(*(volatile uint16_t *)(YKYX_BASE + 4)), 
+		usart_putint(YKYX_BASE + 4), 
+		usart_putint(*(volatile uint16_t *)(YKYX_BASE + 4)), 
 		usart_puts("\n");
 	usart_puts("-- Read All YXs -- Done\n\r");
 	
@@ -39,26 +39,26 @@ void testYKYX(void) {
 	*(volatile uint16_t *)(YKYX_BASE + 8) = (uint16_t)0xFFFF;
 	*(volatile uint16_t *)(YKYX_BASE + 10) = (uint16_t)0xFFFF;
 	usart_puts("EXNCS4_YK_PWD_KEY - "), 
-		usart_puts(YKYX_BASE + 6), 
-		usart_puts(0xA525), 
+		usart_putint(YKYX_BASE + 6), 
+		usart_putint(0xA525), 
 		usart_puts("\n");
 	usart_puts("EXNCS5_YK1 - "), 
-		usart_puts(YKYX_BASE + 8), 
-		usart_puts(0xFFFF), 
+		usart_putint(YKYX_BASE + 8), 
+		usart_putint(0xFFFF), 
 		usart_puts("\n");
 	usart_puts("EXNCS6_YK2 - "), 
-		usart_puts(YKYX_BASE + 10), 
-		usart_puts(0xFFFF), 
+		usart_putint(YKYX_BASE + 10), 
+		usart_putint(0xFFFF), 
 		usart_puts("\n");
 	
 	usart_puts("-- Read All YKYXs --\n\r");
 	usart_puts("EXNCS7_YKYX1 - "), 
-		usart_puts(YKYX_BASE + 12), 
-		usart_puts(*(volatile uint16_t *)(YKYX_BASE + 12)), 
+		usart_putint(YKYX_BASE + 12), 
+		usart_putint(*(volatile uint16_t *)(YKYX_BASE + 12)), 
 		usart_puts("\n");
 	usart_puts("EXNCS8_YKYX2 - "), 
-		usart_puts(YKYX_BASE + 14), 
-		usart_puts(*(volatile uint16_t *)(YKYX_BASE + 14)), 
+		usart_putint(YKYX_BASE + 14), 
+		usart_putint(*(volatile uint16_t *)(YKYX_BASE + 14)), 
 		usart_puts("\n");
 	usart_puts("-- Read All YKYXs -- Done --\n\r");
 	

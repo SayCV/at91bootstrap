@@ -11,8 +11,6 @@
 #include "string.h"
 #include "onewire_info.h"
 
-typedef unsigned int uint32_t;
-
 #define BOARD_NORFLASH_ADDR 0x10000000
 
 void testNOR(void) {       
@@ -52,15 +50,15 @@ void testNOR(void) {
 	
 	usart_puts("-- Applet -- Utils Test -- NOR -> Start\n\r");
 	
-	usart_puts("manuf_id  = "), usart_puts(manuf_id), usart_puts("\n");
-	usart_puts("manuf_id1 = "), usart_puts(manuf_id_ext1), usart_puts("\n");
-	usart_puts("manuf_id2 = "), usart_puts(manuf_id_ext2), usart_puts("\n");
-	usart_puts("manuf_id3 = "), usart_puts(manuf_id_ext3), usart_puts("\n");
-	usart_puts("manuf_id4 = "), usart_puts(manuf_id_ext4), usart_puts("\n");
+	usart_puts("----- manuf_id  = "), usart_putint(manuf_id), usart_puts("\n");
+	usart_puts("----- manuf_id1 = "), usart_putint(manuf_id_ext1), usart_puts("\n");
+	usart_puts("----- manuf_id2 = "), usart_putint(manuf_id_ext2), usart_puts("\n");
+	usart_puts("----- manuf_id3 = "), usart_putint(manuf_id_ext3), usart_puts("\n");
+	usart_puts("----- manuf_id4 = "), usart_putint(manuf_id_ext4), usart_puts("\n");
 	
-	usart_puts("query_id1 = "), usart_puts(query_id1), usart_puts("\n");
-	usart_puts("query_id2 = "), usart_puts(query_id2), usart_puts("\n");
-	usart_puts("query_id3 = "), usart_puts(query_id3), usart_puts("\n");
+	usart_puts("----- query_id1 = "), usart_putint(query_id1), usart_puts("\n");
+	usart_puts("----- query_id2 = "), usart_putint(query_id2), usart_puts("\n");
+	usart_puts("----- query_id3 = "), usart_putint(query_id3), usart_puts("\n");
 	
 	usart_puts("-- Applet -- Utils Test -- NOR -> Done\n\r");
 }
