@@ -175,7 +175,7 @@ void usart_putint( int num )
 {
   unsigned char buffer[10];
 
-  itoa( num, buffer, 10 );
+  itoa( num, buffer, 16 );
   usart_puts( buffer );
 }
 
