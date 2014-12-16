@@ -1,4 +1,4 @@
-#include <common.h>
+#include "test.h"
 #include "cfi_flash.h"
 
 /*

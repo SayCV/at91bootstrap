@@ -3,11 +3,14 @@
 
 LIBTEST:=$(TOPDIR)/test
 
+COBJS-y		+= $(LIBTEST)/printf.o
+
 COBJS-y		+= $(LIBTEST)/testHelper.o
 
-COBJS-y		+= $(LIBTEST)/cfi_flash.o
+COBJS-y		+= $(LIBTEST)/memtest.o
 
-COBJS-y		+= $(LIBTEST)/cfi_flash_amd.o
+#COBJS-y		+= $(LIBTEST)/cfi_flash.o
+#COBJS-y		+= $(LIBTEST)/cfi_flash_amd.o
 
 COBJS-y		+= $(LIBTEST)/test-DDR2.o
 COBJS-y		+= $(LIBTEST)/test-LED.o

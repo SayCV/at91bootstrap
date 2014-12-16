@@ -1,5 +1,5 @@
-#include <common.h>
-#include <stdio.h>
+
+#include "test.h"
 #include "cfi_flash.h"
 
 /*-----------------------------------------------------------------------

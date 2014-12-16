@@ -15,6 +15,8 @@
 
 #define BOARD_NORFLASH_ADDR 0x10000000
 
+const char *dev = "NOR: ";
+
 void testNOR(void) {       
 	uint32_t base_addr = BOARD_NORFLASH_ADDR;
 	
@@ -56,7 +58,8 @@ void testNOR(void) {
 	
 	usart_puts("-- Applet -- Utils Test -- NOR -> Start\n\r");
 	
-	usart_puts("----- manuf_id  = "), usart_putint(manuf_id), usart_puts("\n");
+	//usart_puts("----- manuf_id  = "), usart_putint(manuf_id), usart_puts("\n");
+	printf("----- manuf_id  = 0x%08x\n", manuf_id);
 	usart_puts("----- manuf_id1 = "), usart_putint(manuf_id_ext1), usart_puts("\n");
 	usart_puts("----- manuf_id2 = "), usart_putint(manuf_id_ext2), usart_puts("\n");
 	usart_puts("----- manuf_id3 = "), usart_putint(manuf_id_ext3), usart_puts("\n");

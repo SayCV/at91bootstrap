@@ -39,6 +39,7 @@ typedef u8 cfiword_t;
 #endif
 
 struct cfi_cmd_set;
+struct mtd_info;
 
 /*-----------------------------------------------------------------------
  * FLASH Info: contains chip specific data, per FLASH bank

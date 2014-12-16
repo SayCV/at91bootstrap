@@ -22,6 +22,11 @@
 
 #include "cfi_flash.h"
 
+void dev_info(char *dev, char *fmt, ...);
+#define dev_dbg dev_info
+#define dev_err dev_info
+
+
 
 /*
  * This file implements a Common Flash Interface (CFI) driver for barebox.
@@ -361,7 +366,7 @@ static ulong flash_get_size (struct flash_info *info)
 		       size_ratio, info->portwidth << CFI_FLASH_SHIFT_WIDTH,
 		       info->chipwidth << CFI_FLASH_SHIFT_WIDTH);
 		dev_dbg(info->dev, "found %d erase regions\n", num_erase_regions);
-		info->eraseregions = xzalloc(sizeof(*(info->eraseregions)) * num_erase_regions);
+		info->eraseregions = malloc(sizeof(*(info->eraseregions)) * num_erase_regions);
 		info->numeraseregions = num_erase_regions;
 		sect_cnt = 0;
 		sector = base;
@@ -469,7 +474,7 @@ static int cfi_erase(struct flash_info *finfo, size_t count, loff_t offset)
                         goto out;
 
 		if (ctrlc()) {
-			ret = -EINTR;
+			ret = -1;
 			goto out;
 		}
         }
@@ -985,7 +990,7 @@ static int cfi_probe (struct device_d *dev)
 	usart_puts("## Found cfi flash at "), usart_putint(info->base), usart_putint(info->size);
 	usart_puts("\n\r");
 	
-	cfi_init_mtd(info);
+	//cfi_init_mtd(info);
 
 	return 0;
 }
