@@ -81,7 +81,7 @@ int testUtils(void) {
 	usart_puts("---------------------------------\n\r");
 	usart_puts("---------------------------------\n\r");
 	
-	testResult = 1;
+	testResult = 0;
 	usart_puts("----- press 'c' Key to continue !!!\n\r");
 	while( 'c' != usart_getc() ) {
 		testResult = 0;
