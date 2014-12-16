@@ -23,7 +23,7 @@ endif
 
 BINDIR:=$(TOPDIR)/binaries
 
-DATE := $(shell date date '+%Y-%m-%d %H:%M:%S')
+DATE := $(shell date '+%Y-%m-%d %H:%M:%S')
 VERSION := 3.6.2
 REVISION :=
 SCMINFO := $(shell ($(TOPDIR)/host-utilities/setlocalversion $(TOPDIR)))
