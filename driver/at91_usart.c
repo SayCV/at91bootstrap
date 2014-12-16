@@ -29,7 +29,7 @@
 #include "board.h"
 #include "arch/at91_dbgu.h"
 
-#include "div.h"
+
 
 #ifndef USART_BASE
 #define USART_BASE	AT91C_BASE_DBGU
@@ -69,7 +69,7 @@ void usart_init(unsigned int baudrate)
 	write_usart(DBGU_CR, AT91C_DBGU_RXEN | AT91C_DBGU_TXEN);
 }
 
-static void usart_putc(const char c)
+void usart_putc(const char c)
 {
 	while (!(read_usart(DBGU_CSR) & AT91C_DBGU_TXRDY))
 		;

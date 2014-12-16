@@ -24,26 +24,7 @@
 
 #include "test/test.h"
 
-#define VENDOR_DTU_CPU_V1 0
-#define VENDOR_DTU_SP_V1  1
-#define VENDOR_NDTU_FA_V1 10
-#define BOARD_VENDOR VENDOR_NDTU_FA_V1
 
-#define DEBUG_NCS0   0 /* Nor Flash */
-#define DEBUG_NCS1   1 /* DDR2 */
-#define DEBUG_NCS2   2 /* Ext. */
-#define DEBUG_NCS3   3 /* Ext. */
-#define DEBUG_NCS4   4 /* Ext. */
-#define DEBUG_NCS5   5 /* Ext. */
-
-#define DEBUG_YKYX 1
-
-#define DEBUG_DDR2 1
-#define DEBUG_NAND 1
-#define DEBUG_NOR  1
-
-#define DEBUG_YC   1
-#define DEBUG_YKYX 1
 
 static int testResult = 0;
 
@@ -69,9 +50,17 @@ static int testResult = 0;
 #endif
 */
 
+/*
+void printf_usart_putc( void* p, char c) {
+	usart_putc(c);
+}
+*/
+
 int testUtils(void) {
 	//PIO_Configure(pPinsNandFlash, PIO_LISTSIZE(pPinsNandFlash));
 	//PIO_Configure(pPinsNf, PIO_LISTSIZE(pPinsNf));
+	
+	//init_printf(NULL, printf_usart_putc);
 	
 	usart_puts("---------------------------------\n\r");
 	usart_puts("---------------------------------\n\r");
@@ -91,6 +80,13 @@ int testUtils(void) {
 	usart_puts("-- Applet -- Utils Test Done\n\r");
 	usart_puts("---------------------------------\n\r");
 	usart_puts("---------------------------------\n\r");
+	
+	testResult = 1;
+	usart_puts("----- press 'c' Key to continue !!!\n\r");
+	while( 'c' != usart_getc() ) {
+		testResult = 0;
+		mdelay(200);
+	}
 	
 	return testResult;
 }

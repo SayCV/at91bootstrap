@@ -100,5 +100,7 @@ void testYKYX();
 
 void dev_info(char *dev, char *p_fmt, ...);
 
+void mdelay(unsigned int msec);
+
 #endif /* __TEST_UTILS_H */
 

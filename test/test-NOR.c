@@ -17,7 +17,35 @@
 
 const char *dev = "NOR: ";
 
-void testNOR(void) {       
+/* Configure NorFlash PINs */
+	const struct pio_desc test_nor_pins[] = {
+		/*{"NANDOE",	AT91C_PIN_PD(0),		0, PIO_PULLUP, PIO_PERIPH_A},
+		{"NANDWE",	AT91C_PIN_PD(1),		0, PIO_PULLUP, PIO_PERIPH_A},
+		{"NANDALE",	AT91C_PIN_PD(2),	0, PIO_PULLUP, PIO_PERIPH_A},
+		{"NANDCLE",	AT91C_PIN_PD(3),	0, PIO_PULLUP, PIO_PERIPH_A},
+		{"NANDCS",	AT91C_PIN_PD(4),	1, PIO_PULLUP, PIO_OUTPUT},
+		{"NANDWAIT",	AT91C_PIN_PD(5),	0, PIO_PULLUP, PIO_INPUT},
+		{"D0",	AT91C_PIN_PD(6), 0, PIO_PULLUP, PIO_PERIPH_A},
+		{"D1",	AT91C_PIN_PD(7), 0, PIO_PULLUP, PIO_PERIPH_A},
+		{"D2",	AT91C_PIN_PD(8), 0, PIO_PULLUP, PIO_PERIPH_A},
+		{"D3",	AT91C_PIN_PD(9), 0, PIO_PULLUP, PIO_PERIPH_A},
+		{"D4",	AT91C_PIN_PD(10), 0, PIO_PULLUP, PIO_PERIPH_A},
+		{"D5",	AT91C_PIN_PD(11), 0, PIO_PULLUP, PIO_PERIPH_A},
+		{"D6",	AT91C_PIN_PD(12), 0, PIO_PULLUP, PIO_PERIPH_A},
+		{"D7",	AT91C_PIN_PD(13), 0, PIO_PULLUP, PIO_PERIPH_A},*/
+		{"A20",	AT91C_PIN_PD(15), 0, PIO_PULLUP, PIO_PERIPH_B},
+		{"A21",	AT91C_PIN_PD(16), 0, PIO_PULLUP, PIO_PERIPH_B},
+		{"A22",	AT91C_PIN_PD(17), 0, PIO_PULLUP, PIO_PERIPH_B},
+		{"A23",	AT91C_PIN_PD(18), 0, PIO_PULLUP, PIO_PERIPH_B},
+		{"NCS2",	AT91C_PIN_PD(19), 0, PIO_PULLUP, PIO_PERIPH_B},
+		{"NCS3",	AT91C_PIN_PD(20), 0, PIO_PULLUP, PIO_PERIPH_B},
+		{"NCS4",	AT91C_PIN_PD(21), 0, PIO_PULLUP, PIO_PERIPH_B},
+		{(char *)0, 0, 0, PIO_DEFAULT, PIO_PERIPH_A},
+	};
+
+void testNOR(void) {
+	uint32_t i = 0;
+	   
 	uint32_t base_addr = BOARD_NORFLASH_ADDR;
 	
 	uint32_t manuf_id=0;
@@ -29,7 +57,27 @@ void testNOR(void) {
 	uint32_t query_id1=0;
 	uint32_t query_id2=0;
 	uint32_t query_id3=0;
-	
+/*	
+	usart_puts("-- Applet -- Utils Test -- NOR PINs -> Start\n\r");
+	nandflash_hw_disable();
+	//norflash_hw_init();
+	//Configure the PIO controller
+	pio_configure(test_nor_pins);
+	usart_puts("----- NOR PINs: PD15-21 -- Output HIGH, press 'c' Key to continue !!!\n\r");
+	usart_puts("----- That's point at PCBA: \n\r");
+	usart_puts("----- | PD15 | PD16 | PD17 | PD18 | PD19 | PD20 | PD21 |\n\r");
+	usart_puts("----- | PD15 | PD16 | PD17 | PD18 | PD19 | PD20 | PD21 |\n\r");
+	while( 'c' != usart_getc() ) {
+		mdelay(200);
+	}
+	usart_puts("----- NOR PINs: PD15-21 -- Output LOW, press 'c' Key to continue !!!\n\r");
+	while( 'c' != usart_getc() ) {
+		mdelay(200);
+	}
+	usart_puts("-- Applet -- Utils Test -- NOR PINs -> Results provided by User's Meter\n\r");
+	usart_puts("-- Applet -- Utils Test -- NOR PINs -> Can not detect EBI PINs: NCS0, NRE,NRD\n\r");
+	usart_puts("-- Applet -- Utils Test -- NOR PINs -> END\n\r");
+*/	
 	//nandflash_hw_disable();
 	norflash_hw_init();
 	//at91_smc_init(DEBUG_NCS0, 16);
@@ -59,15 +107,15 @@ void testNOR(void) {
 	usart_puts("-- Applet -- Utils Test -- NOR -> Start\n\r");
 	
 	//usart_puts("----- manuf_id  = "), usart_putint(manuf_id), usart_puts("\n");
-	printf("----- manuf_id  = 0x%08x\n", manuf_id);
-	usart_puts("----- manuf_id1 = "), usart_putint(manuf_id_ext1), usart_puts("\n");
-	usart_puts("----- manuf_id2 = "), usart_putint(manuf_id_ext2), usart_puts("\n");
-	usart_puts("----- manuf_id3 = "), usart_putint(manuf_id_ext3), usart_puts("\n");
-	usart_puts("----- manuf_id4 = "), usart_putint(manuf_id_ext4), usart_puts("\n");
+	dbg_info("----- manuf_id  = %d\n", manuf_id);
+	dbg_info("----- manuf_id_ext1  = %d\n", manuf_id_ext1);
+	dbg_info("----- manuf_id_ext1  = %d\n", manuf_id_ext2);
+	dbg_info("----- manuf_id_ext1  = %d\n", manuf_id_ext3);
+	dbg_info("----- manuf_id_ext1  = %d\n", manuf_id_ext4);
 	
-	usart_puts("----- query_id1 = "), usart_putint(query_id1), usart_puts("\n");
-	usart_puts("----- query_id2 = "), usart_putint(query_id2), usart_puts("\n");
-	usart_puts("----- query_id3 = "), usart_putint(query_id3), usart_puts("\n");
+	dbg_info("----- query_id1  = %d\n", query_id1);
+	dbg_info("----- query_id2  = %d\n", query_id2);
+	dbg_info("----- query_id3  = %d\n", query_id3);
 	
 	usart_puts("-- Applet -- Utils Test -- NOR -> Done\n\r");
 }
