@@ -3,6 +3,8 @@
 
 LIBTEST:=$(TOPDIR)/test
 
+COBJS-y		+= $(LIBTEST)/testHelper.o
+
 COBJS-y		+= $(LIBTEST)/cfi_flash.o
 
 COBJS-y		+= $(LIBTEST)/cfi_flash_amd.o
