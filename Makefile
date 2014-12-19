@@ -185,7 +185,7 @@ endif
 
 ifeq ($(CONFIG_DEBUG_HARDWARE), y)
 $(echo "Make for DEBUG HARDWARE!!!")
-COBJS-y:= $(TOPDIR)/main_testUtils.o $(TOPDIR)/main_testUtilsAdd.o $(TOPDIR)/board/$(BOARDNAME)/$(BOARDNAME).o
+COBJS-y:= $(TOPDIR)/main_haveTestUtils.o $(TOPDIR)/board/$(BOARDNAME)/$(BOARDNAME).o
 else
 COBJS-y:= $(TOPDIR)/main.o $(TOPDIR)/board/$(BOARDNAME)/$(BOARDNAME).o
 endif

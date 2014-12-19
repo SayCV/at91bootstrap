@@ -3,11 +3,9 @@
 
 LIBTEST:=$(TOPDIR)/test
 
-COBJS-y		+= $(LIBTEST)/printf.o
-
-COBJS-y		+= $(LIBTEST)/testHelper.o
-
-COBJS-y		+= $(LIBTEST)/memtest.o
+COBJS-y		+= $(LIBTEST)/delayHelper.o
+COBJS-y		+= $(LIBTEST)/busOpsHelper.o
+COBJS-y		+= $(LIBTEST)/memTestHelper.o
 
 #COBJS-y		+= $(LIBTEST)/cfi_flash.o
 #COBJS-y		+= $(LIBTEST)/cfi_flash_amd.o
@@ -18,5 +16,7 @@ COBJS-y		+= $(LIBTEST)/test-NAND.o
 COBJS-y		+= $(LIBTEST)/test-NOR.o
 COBJS-y		+= $(LIBTEST)/test-YC.o
 COBJS-y		+= $(LIBTEST)/test-YKYX.o
+
+COBJS-y		+= $(LIBTEST)/mainTestUtils.o
 
 #COBJS-$(CONFIG_OF_LIBFDT) += $(LIBC)/fdt.o

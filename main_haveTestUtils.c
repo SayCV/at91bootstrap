@@ -139,9 +139,9 @@ int main(void)
 #endif
 	
 	/* User Test Utils Start */
-	int testUtils(void);
-	if( testUtils() ) {
-		usart_puts("-- Applet -- Utils Test at DebugModel -- Will hangs up here for ever.\n\r");
+	int main_testUtils(void);
+	if( main_testUtils() ) {
+		usart_puts("Can't come here for ever.\n\r");
 		while (1);
 	}
 	/* User Test Utils End */
