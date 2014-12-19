@@ -18,6 +18,7 @@
 #include "at91sam9x5ek.h"
 #include "onewire_info.h"
 
+#include "test.h"
 
 void nandflash_hw_enable(void) {
 	unsigned int reg;

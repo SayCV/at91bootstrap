@@ -3,7 +3,7 @@
 
 //udelay(33000); /* 33 ms: the maximum delay of udelay() */
 void mdelay(unsigned int msec) {
-	uint32_t i = 0;
+	unsigned int i = 0;
 	for(i = 0; i<msec; i++)
 		udelay(1000); /* 1 ms */
 }

@@ -22,7 +22,7 @@
 
 #include "usart.h"
 
-#include "test/test.h"
+#include "test.h"
 
 
 
@@ -56,7 +56,7 @@ void printf_usart_putc( void* p, char c) {
 }
 */
 
-int testUtils(void) {
+int main_testUtils(void) {
 	//PIO_Configure(pPinsNandFlash, PIO_LISTSIZE(pPinsNandFlash));
 	//PIO_Configure(pPinsNf, PIO_LISTSIZE(pPinsNf));
 	
