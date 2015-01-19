@@ -68,7 +68,7 @@ int main_testUtils(void) {
 	usart_puts("---------------------------------\n\r");
 	usart_puts("---------------------------------\n\r");
 	
-	testDDR2();
+	//testDDR2();
 	testNAND();
 	testNOR();
 	
